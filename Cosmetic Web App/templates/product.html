@@ -10,7 +10,7 @@
 <body>
 
     <nav class="navbar">
-        <div class="logo">GlowHaus</div>
+        <a href="/" class="logo">GlowHaus</a>
     </nav>
 
 
@@ -27,15 +27,21 @@
 
             <h1>{{ product.product_name }}</h1>
 
-            <p class="detail-price">${{ product.price }}</p>
+            <p class="detail-price">Rs. {{ product.price }}</p>
 
             <p class="detail-rating">
-                ⭐ {{ product.avg_product_rating }}
+                Rating: {{ product.avg_product_rating }}
             </p>
 
             <p class="detail-description">
                 {{ product.description }}
             </p>
+
+            {% if product.product_url %}
+            <a href="{{ product.product_url }}" target="_blank" rel="noopener" class="source-link">
+                View original product
+            </a>
+            {% endif %}
 
             <a href="/review/{{ product.id }}">
                 <button class="review-btn">
@@ -58,7 +64,7 @@
             <h3>{{ review.review_title }}</h3>
 
             <p class="review-rating">
-                ⭐ {{ review.review_rating }}
+                Rating: {{ review.review_rating }}
             </p>
 
             <p>{{ review.review_text }}</p>
@@ -67,6 +73,10 @@
                 {{ review.is_a_buyer }}
             </span>
         </div>
+
+        {% else %}
+
+        <p class="empty-state">No reviews yet.</p>
 
         {% endfor %}
 
@@ -90,10 +100,14 @@
 
                     <h4>{{ item.product_name }}</h4>
 
-                    <p class="price">${{ item.price }}</p>
+                    <p class="price">Rs. {{ item.price }}</p>
                 </div>
 
             </a>
+
+            {% else %}
+
+            <p class="empty-state">No recommendations available.</p>
 
             {% endfor %}
 

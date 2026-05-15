@@ -29,6 +29,8 @@ body {
     font-size: 28px;
     font-weight: 700;
     letter-spacing: 1px;
+    color: #111111;
+    text-decoration: none;
 }
 
 .search-bar {
@@ -117,6 +119,11 @@ body {
     font-size: 32px;
 }
 
+.result-message {
+    color: #666666;
+    margin-top: 10px;
+}
+
 
 /* PRODUCT GRID */
 
@@ -182,6 +189,11 @@ body {
     color: #666;
 }
 
+.empty-state {
+    grid-column: 1 / -1;
+    color: #666;
+}
+
 
 /* PRODUCT DETAIL */
 .product-detail-container {
@@ -221,6 +233,12 @@ body {
 .detail-description {
     line-height: 1.8;
     margin-bottom: 35px;
+}
+
+.source-link {
+    display: inline-block;
+    color: #111111;
+    margin-bottom: 25px;
 }
 
 .review-btn,
@@ -355,3 +373,4 @@ footer {
         width: 90%;
     }
 }
+

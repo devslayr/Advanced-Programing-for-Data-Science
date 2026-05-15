@@ -13,10 +13,15 @@
 <body>
 
     <nav class="navbar">
-        <div class="logo">GlowHaus</div>
+        <a href="/" class="logo">GlowHaus</a>
 
         <form class="search-bar" method="GET" action="/search">
-            <input type="text" name="query" placeholder="Search beauty products, brands...">
+            <input
+                type="text"
+                name="query"
+                placeholder="Search beauty products, brands..."
+                value="{{ query }}"
+            >
             <button type="submit">Search</button>
         </form>
 
@@ -40,7 +45,8 @@
 
 
     <section class="section-title">
-        <h2>Trending Beauty Products</h2>
+        <h2>{{ page_title }}</h2>
+        <p class="result-message">{{ result_message }}</p>
     </section>
 
 
@@ -60,13 +66,17 @@
 
                     <h3>{{ product.product_name }}</h3>
 
-                    <p class="price">${{ product.price }}</p>
+                    <p class="price">Rs. {{ product.price }}</p>
 
-                    <p class="rating">⭐ {{ product.avg_product_rating }}</p>
+                    <p class="rating">Rating: {{ product.avg_product_rating }}</p>
                 </div>
 
             </div>
         </a>
+
+        {% else %}
+
+        <p class="empty-state">No products found.</p>
 
         {% endfor %}
 
@@ -74,7 +84,7 @@
 
 
     <footer>
-        <p>GlowHaus Beauty © 2026</p>
+        <p>GlowHaus Beauty &copy; 2026</p>
     </footer>
 
 </body>
