@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Review</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">GlowHaus</div>
+    </nav>
+
+
+    <section class="review-form-container">
+
+        <h1>Create Review</h1>
+
+        <form method="POST">
+
+            <label>Review Title</label>
+            <input type="text" name="review_title" required>
+
+
+            <label>Review Description</label>
+            <textarea name="review_text" rows="8" required></textarea>
+
+
+            <label>Rating</label>
+            <select name="review_rating">
+                <option>1</option>
+                <option>2</option>
+                <option>3</option>
+                <option>4</option>
+                <option selected>5</option>
+            </select>
+
+
+            <div class="prediction-box">
+                <h3>AI Recommendation Prediction</h3>
+
+                <div class="prediction-result">
+                    {{ prediction_label }}
+                </div>
+            </div>
+
+
+            <label>Override Recommendation</label>
+            <select name="is_a_buyer">
+                <option value="True">Buyer</option>
+                <option value="False">Not Buyer</option>
+            </select>
+
+
+            <button type="submit" class="submit-btn">
+                Submit Review
+            </button>
+
+        </form>
+
+    </section>
+
+</body>
+</html>

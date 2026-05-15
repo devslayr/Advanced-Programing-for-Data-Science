@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GlowHaus Beauty</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">GlowHaus</div>
+
+        <form class="search-bar" method="GET" action="/search">
+            <input type="text" name="query" placeholder="Search beauty products, brands...">
+            <button type="submit">Search</button>
+        </form>
+
+        <div class="nav-links">
+            <a href="#">New In</a>
+            <a href="#">Brands</a>
+            <a href="#">Skincare</a>
+            <a href="#">Makeup</a>
+        </div>
+    </nav>
+
+
+    <section class="hero">
+        <div class="hero-content">
+            <p class="hero-subtitle">THE BEAUTY EDIT</p>
+            <h1>Luxury Beauty Essentials</h1>
+            <p>Discover trending skincare, makeup and wellness products.</p>
+            <button>Shop Now</button>
+        </div>
+    </section>
+
+
+    <section class="section-title">
+        <h2>Trending Beauty Products</h2>
+    </section>
+
+
+    <section class="product-grid">
+
+        {% for product in products %}
+
+        <a href="/product/{{ product.id }}" class="product-card-link">
+            <div class="product-card">
+
+                <div class="product-image-wrapper">
+                    <img src="{{ product.image }}" alt="{{ product.product_name }}">
+                </div>
+
+                <div class="product-info">
+                    <p class="brand-name">{{ product.brand_name }}</p>
+
+                    <h3>{{ product.product_name }}</h3>
+
+                    <p class="price">${{ product.price }}</p>
+
+                    <p class="rating">⭐ {{ product.avg_product_rating }}</p>
+                </div>
+
+            </div>
+        </a>
+
+        {% endfor %}
+
+    </section>
+
+
+    <footer>
+        <p>GlowHaus Beauty © 2026</p>
+    </footer>
+
+</body>
+</html>

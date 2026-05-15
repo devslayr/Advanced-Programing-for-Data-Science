@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ product.product_name }}</title>
+
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar">
+        <div class="logo">GlowHaus</div>
+    </nav>
+
+
+    <section class="product-detail-container">
+
+        <div class="product-detail-image">
+            <img src="{{ product.image }}" alt="{{ product.product_name }}">
+        </div>
+
+
+        <div class="product-detail-info">
+
+            <p class="detail-brand">{{ product.brand_name }}</p>
+
+            <h1>{{ product.product_name }}</h1>
+
+            <p class="detail-price">${{ product.price }}</p>
+
+            <p class="detail-rating">
+                ⭐ {{ product.avg_product_rating }}
+            </p>
+
+            <p class="detail-description">
+                {{ product.description }}
+            </p>
+
+            <a href="/review/{{ product.id }}">
+                <button class="review-btn">
+                    Write Review
+                </button>
+            </a>
+
+        </div>
+
+    </section>
+
+
+    <section class="reviews-section">
+
+        <h2>Customer Reviews</h2>
+
+        {% for review in reviews %}
+
+        <div class="review-card">
+            <h3>{{ review.review_title }}</h3>
+
+            <p class="review-rating">
+                ⭐ {{ review.review_rating }}
+            </p>
+
+            <p>{{ review.review_text }}</p>
+
+            <span class="buyer-label">
+                {{ review.is_a_buyer }}
+            </span>
+        </div>
+
+        {% endfor %}
+
+    </section>
+
+
+    <section class="recommend-section">
+
+        <h2>You May Also Like</h2>
+
+        <div class="recommend-grid">
+
+            {% for item in recommendations %}
+
+            <a href="/product/{{ item.id }}" class="product-card-link">
+
+                <div class="recommend-card">
+                    <img src="{{ item.image }}" alt="{{ item.product_name }}">
+
+                    <p class="brand-name">{{ item.brand_name }}</p>
+
+                    <h4>{{ item.product_name }}</h4>
+
+                    <p class="price">${{ item.price }}</p>
+                </div>
+
+            </a>
+
+            {% endfor %}
+
+        </div>
+
+    </section>
+
+</body>
+</html>
