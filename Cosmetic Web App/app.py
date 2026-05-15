@@ -80,6 +80,75 @@ def text_similarity(first_text, second_text):
     return SequenceMatcher(None, first_text, second_text).ratio()
 
 
+def meaningful_words(text):
+    """
+    Keep useful query words and ignore very short words that add noise.
+    """
+    return [word for word in normalize_text(text).split() if len(word) >= 3]
+
+
+def word_matches_text(word, text, threshold=0.84):
+    """
+    Check if one query word appears in text, allowing small typos.
+    """
+    normalized_text = normalize_text(text)
+
+    if word in normalized_text:
+        return True
+
+    return any(
+        text_similarity(word, text_word) >= threshold
+        for text_word in normalized_text.split()
+    )
+
+
+def word_matches_brand(word, brand_name):
+    """
+    Check if a query word belongs to the brand name.
+    """
+    brand_words = meaningful_words(brand_name)
+
+    return any(
+        word in brand_word
+        or brand_word in word
+        or text_similarity(word, brand_word) >= 0.84
+        for brand_word in brand_words
+    )
+
+
+def extra_product_words(query, brand_name):
+    """
+    Return query words that are not part of the brand name.
+    For "olay ultimate", "ultimate" is the extra product word.
+    For "maybeline new york", there are no extra product words because the
+    whole query is treated as a fuzzy brand search.
+    """
+    return [
+        word for word in meaningful_words(query)
+        if not word_matches_brand(word, brand_name)
+    ]
+
+
+def product_matches_extra_words(query, product):
+    """
+    If users search for brand + keyword, require the keyword part to match
+    product-specific text. This prevents "olay ultimate" from returning every
+    Olay product.
+    """
+    extra_words = extra_product_words(query, product["brand_name"])
+
+    if not extra_words:
+        return True
+
+    product_text = (
+        product["product_name"] + " " +
+        product["product_tags"] + " " +
+        product["description"]
+    )
+
+    return all(word_matches_text(word, product_text) for word in extra_words)
+
+
 def brand_matches_query(query, brand_name):
     """
     Check whether the query likely refers to a brand.
@@ -221,6 +290,9 @@ def search_products(products, query):
     scored_products = []
 
     for product in products:
+        if not product_matches_extra_words(query, product):
+            continue
+
         score = score_product(query, product)
 
         if score >= 20:
