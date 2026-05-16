@@ -20,26 +20,25 @@
                 type="text"
                 name="query"
                 placeholder="Search beauty products, brands..."
-                value="{{ query }}"
+                value="{{ query or '' }}"
             >
             <button type="submit">Search</button>
         </form>
 
-        <div class="nav-links">
+        <div class="nav-links" style="display: flex; align-items: center;">
             <a href="#">New In</a>
             <a href="#">Brands</a>
             
-            <!-- User session tracking block -->
-            {% if session.username %}
-                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px;">Hello, {{ session.username }}!</span>
+            {% if session and session.get('username') %}
+                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px;">Hello, {{ session.get('username') }}!</span>
                 <a href="/logout" style="color: #e74c3c;">Log Out</a>
             {% else %}
                 <a href="/login">Log In</a>
                 <a href="/signup" style="font-weight: 600;">Sign Up</a>
             {% endif %}
+            <a href="/admin/login" style="margin-left: 15px; padding: 6px 14px; background-color: #000; color: #fff; border-radius: 4px; text-decoration: none; font-weight: 500; font-size: 0.85rem;">Admin Portal</a>
         </div>
     </nav>
-
 
     <section class="hero">
         <div class="hero-content">
@@ -50,15 +49,13 @@
         </div>
     </section>
 
-
     <section class="section-title">
-        <h2>{{ page_title }}</h2>
-        <p class="result-message">{{ result_message }}</p>
+        <h2>{{ page_title or 'Trending Beauty Products' }}</h2>
+        <p class="result-message">{{ result_message or '' }}</p>
     </section>
 
     <section class="controls-section">
         <form method="GET" action="/" id="filter-sort-form">
-            <!-- Preserve search query if there is one -->
             {% if query %}
             <input type="hidden" name="query" value="{{ query }}">
             {% endif %}
@@ -68,7 +65,11 @@
                 <select name="brand" id="brand" onchange="document.getElementById('filter-sort-form').submit();">
                     <option value="">All Brands</option>
                     {% for brand in brands %}
-                    <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                        {% set is_brand_selected = '' %}
+                        {% if selected_brand == brand %}
+                            {% set is_brand_selected = 'selected' %}
+                        {% endif %}
+                        <option value="{{ brand }}" {{ is_brand_selected }}>{{ brand }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -87,43 +88,38 @@
 
     <section class="product-grid">
 
-        {% for product in products %}
+        {% if products and products|length > 0 %}
+            {% for product in products %}
+            <a href="/product/{{ product['id'] if 'id' in product else 0 }}" class="product-card-link">
+                <div class="product-card">
 
-        <a
-            href="/product/{{ product.id }}"
-            class="product-card-link {% if product.product_name|length > 60 %}featured-product{% elif product.product_name|length > 38 %}wide-product{% endif %}"
-        >
-            <div class="product-card">
+                    <div class="image-container">
+                        <img src="{{ product['image'] if 'image' in product else '' }}" alt="{{ product['product_name'] if 'product_name' in product else 'Cosmetic' }}">
+                    </div>
 
-                <div class="product-image-wrapper">
-                    <img src="{{ product.image }}" alt="{{ product.product_name }}">
+                    <div class="product-info">
+                        <p class="brand-name">{{ product['brand_name'] if 'brand_name' in product else 'Generic Brand' }}</p>
+
+                        <h3>{{ product['product_name'] if 'product_name' in product else 'Untitled Product' }}</h3>
+
+                        <p class="price">Rs. {{ product['price'] if 'price' in product else '0.00' }}</p>
+
+                        <p class="rating-val" style="margin-top: 5px;">Rating: {{ product['avg_product_rating'] if 'avg_product_rating' in product else '0.0' }} ⭐</p>
+                    </div>
+
                 </div>
-
-                <div class="product-info">
-                    <p class="brand-name">{{ product.brand_name }}</p>
-
-                    <h3>{{ product.product_name }}</h3>
-
-                    <p class="price">Rs. {{ product.price }}</p>
-
-                    <p class="rating">Rating: {{ product.avg_product_rating }}</p>
-                </div>
-
-            </div>
-        </a>
-
+            </a>
+            {% endfor %}
         {% else %}
-
-        <p class="empty-state">No products found.</p>
-
-        {% endfor %}
+            <p class="empty-state" style="grid-column: 1 / -1; text-align: center; padding: 40px 0; font-weight: 500; color: #666;">No products matched your parameters.</p>
+        {% endif %}
 
     </section>
 
-
-    <footer>
-        <p>GlowHaus Beauty &copy; 2026</p>
+    <footer style="text-align: center; padding: 30px 0; margin-top: 80px; border-top: 1px solid #eeeeee;">
+        <p style="color: #111111; font-family: 'Inter', sans-serif; font-size: 0.95rem;">GlowHaus Beauty &copy; 2026</p>
+        <p><a href="/admin/login" style="color: #666; text-decoration: none; font-size: 0.85rem; display: block; margin-top: 5px; font-family: 'Inter', sans-serif;">System Management Portal</a></p>
     </footer>
-
+    
 </body>
 </html>
