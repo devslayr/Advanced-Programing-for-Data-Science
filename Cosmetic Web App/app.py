@@ -1,11 +1,12 @@
 import csv
 import re
+import os
 from collections import Counter
 from difflib import SequenceMatcher
 from math import sqrt
 from pathlib import Path
 
-from flask import Flask, render_template, request, abort
+from flask import Flask, render_template, request, abort, redirect, url_for
 
 app = Flask(__name__)
 
@@ -422,6 +423,28 @@ def load_products():
 
     return products
 
+# Define paths (Adjust to match your existing path variables)
+REVIEWS_CSV = os.path.join("data", "reviews.csv")
+
+def load_all_reviews():
+    """Reads all rows from reviews.csv into dictionary objects."""
+    reviews = []
+    if not os.path.exists(REVIEWS_CSV):
+        return reviews
+
+    with open(REVIEWS_CSV, mode="r", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            reviews.append({
+                # Convert to integer so it matches our product ID type safely
+                "product_id": int(row.get("product_id", 0)),
+                "review_title": row.get("review_title", "No Title"),
+                "review_rating": row.get("review_rating", "0.0"),
+                "review_text": row.get("review_text", ""),
+                "is_a_buyer": row.get("is_a_buyer", "Guest User")
+            })
+    return reviews
+
 
 @app.route("/")
 def home():
@@ -509,8 +532,8 @@ def search():
 def product_detail(id):
     products = load_products()
 
+    # Find the requested product
     product = None
-
     for item in products:
         if item["id"] == id:
             product = item
@@ -519,14 +542,19 @@ def product_detail(id):
     if product is None:
         abort(404)
 
-    reviews = []
+    # 1. Load all raw reviews from our new CSV file
+    all_reviews = load_all_reviews()
+
+    # 2. Filter out reviews that don't belong to this product ID
+    matched_reviews = [r for r in all_reviews if r["product_id"] == id]
 
     recommendations = get_similar_products(products, product)
 
+    # 3. Pass the dynamic list of reviews down to your template
     return render_template(
         "product.html",
         product=product,
-        reviews=reviews,
+        reviews=matched_reviews,
         recommendations=recommendations
     )
 

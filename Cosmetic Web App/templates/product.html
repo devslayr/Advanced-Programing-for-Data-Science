@@ -55,31 +55,19 @@
 
 
     <section class="reviews-section">
-
         <h2>Customer Reviews</h2>
 
         {% for review in reviews %}
-
         <div class="review-card">
             <h3>{{ review.review_title }}</h3>
-
-            <p class="review-rating">
-                Rating: {{ review.review_rating }}
-            </p>
-
+            <p class="review-rating">Rating: {{ review.review_rating }}</p>
             <p>{{ review.review_text }}</p>
-
-            <span class="buyer-label">
-                {{ review.is_a_buyer }}
-            </span>
+            <span class="buyer-label">{{ review.is_a_buyer }}</span>
         </div>
-
         {% else %}
-
-        <p class="empty-state">No reviews yet.</p>
-
+        <!-- This block fires automatically if matched_reviews is empty -->
+        <p class="empty-state">No reviews yet for this product.</p>
         {% endfor %}
-
     </section>
 
 

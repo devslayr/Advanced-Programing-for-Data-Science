@@ -410,5 +410,45 @@ footer {
     cursor: pointer;
 }
 
+.reviews-section {
+    margin: 40px;
+    padding: 0 20px;
+    font-family: 'Inter', sans-serif;
+}
+
+.review-card {
+    background: #ffffff;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.review-card h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: #111;
+}
+
+.review-rating {
+    color: #e67e22;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.buyer-label {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #27ae60;
+    background: #e8f8f5;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
 
 
