@@ -2,6 +2,7 @@ import csv
 import re
 import os
 from collections import Counter
+from datetime import datetime
 from difflib import SequenceMatcher
 from math import sqrt
 from pathlib import Path
@@ -17,8 +18,22 @@ review_logs = []
 # Project folder pathing setup
 BASE_DIR = Path(__file__).resolve().parent
 PRODUCTS_CSV = BASE_DIR / "data" / "products.csv"
-REVIEWS_CSV = os.path.join("data", "reviews.csv")
-USERS_CSV = os.path.join("data", "users.csv")
+REVIEWS_CSV = BASE_DIR / "data" / "reviews.csv"
+USERS_CSV = BASE_DIR / "data" / "users.csv"
+MODELS_DIR = BASE_DIR / "models"
+
+REVIEW_FIELDS = [
+    "review_id",
+    "product_id",
+    "user_id",
+    "review_title",
+    "review_rating",
+    "review_text",
+    "is_a_buyer",
+    "predicted_label",
+    "predicted_probability",
+    "created_at",
+]
 
 IMAGE_POOL = [
     "https://images.unsplash.com/photo-1620916566398-39f1143ab7be",
@@ -47,6 +62,12 @@ def safe_int(value, default=0):
         return int(value)
     except ValueError:
         return default
+
+def buyer_status_to_binary(status):
+    return 1 if str(status).strip().lower() in {"verified buyer", "true", "1", "buyer"} else 0
+
+def buyer_binary_to_status(value):
+    return "Verified Buyer" if safe_int(value, 0) == 1 else "Guest User"
 
 def normalize_text(value):
     text = str(value or "").lower()
@@ -226,17 +247,52 @@ def load_products():
             products.append(product)
     return products
 
+def find_product(product_id):
+    return next((product for product in load_products() if product["id"] == product_id), None)
+
+def ensure_reviews_file_schema():
+    """
+    Keep reviews.csv compatible with the ML review fields while preserving old rows.
+    """
+    if not os.path.exists(REVIEWS_CSV):
+        with open(REVIEWS_CSV, mode="w", encoding="utf-8-sig", newline="") as file:
+            writer = csv.DictWriter(file, fieldnames=REVIEW_FIELDS)
+            writer.writeheader()
+        return
+
+    with open(REVIEWS_CSV, mode="r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
+        current_fields = reader.fieldnames or []
+        rows = list(reader)
+
+    if current_fields == REVIEW_FIELDS:
+        return
+
+    normalized_rows = []
+    for row in rows:
+        if not row:
+            continue
+
+        normalized_row = {field: row.get(field, "") for field in REVIEW_FIELDS}
+        normalized_rows.append(normalized_row)
+
+    with open(REVIEWS_CSV, mode="w", encoding="utf-8-sig", newline="") as file:
+        writer = csv.DictWriter(file, fieldnames=REVIEW_FIELDS)
+        writer.writeheader()
+        writer.writerows(normalized_rows)
+
 def load_all_reviews():
-    """Reads all rows safely from a headerless reviews.csv file using explicit mapping."""
+    """Reads all review rows safely from reviews.csv."""
     reviews = []
     if not os.path.exists(REVIEWS_CSV):
         return reviews
 
-    # Explicit layout matching the headerless data format perfectly
-    fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
-    with open(REVIEWS_CSV, mode="r", encoding="utf-8-sig") as file:
-        reader = csv.DictReader(file, fieldnames=fieldnames)
+    with open(REVIEWS_CSV, mode="r", encoding="utf-8-sig", newline="") as file:
+        reader = csv.DictReader(file)
         for row in reader:
+            if row.get("review_id") == "review_id":
+                continue
+
             reviews.append({
                 "review_id": safe_int(row.get("review_id"), 0),
                 "product_id": safe_int(row.get("product_id"), 0),
@@ -244,7 +300,10 @@ def load_all_reviews():
                 "review_title": row.get("review_title", "No Title"),
                 "review_rating": safe_float(row.get("review_rating"), 0.0),
                 "review_text": row.get("review_text", ""),
-                "is_a_buyer": row.get("is_a_buyer", "Guest User").strip()
+                "is_a_buyer": row.get("is_a_buyer", "Guest User").strip(),
+                "predicted_label": row.get("predicted_label", "").strip(),
+                "predicted_probability": safe_float(row.get("predicted_probability"), 0.0),
+                "created_at": row.get("created_at", "").strip(),
             })
     return reviews
 
@@ -285,11 +344,131 @@ def save_new_user(username, password, email):
 # =========================================================================
 # MACHINE LEARNING CLASSIFICATION & TELEMETRY INITIALIZATION ENGINE
 # =========================================================================
-def predict_buyer_status(review_title, review_text, rating):
+def load_text_file(path):
+    if not path.exists():
+        return set()
+
+    with open(path, mode="r", encoding="utf-8") as file:
+        return {
+            line.strip().split(":")[0]
+            for line in file
+            if line.strip()
+        }
+
+def load_ml_artifacts():
+    try:
+        import joblib
+        import numpy as np
+
+        return {
+            "available": True,
+            "np": np,
+            "model_desc": joblib.load(MODELS_DIR / "model_desc.joblib"),
+            "model_title": joblib.load(MODELS_DIR / "model_title.joblib"),
+            "model_num": joblib.load(MODELS_DIR / "model_num.joblib"),
+            "title_tfidf": joblib.load(MODELS_DIR / "title_tfidf.joblib"),
+            "glove_dict": joblib.load(MODELS_DIR / "glove_dict.joblib"),
+            "stopwords": load_text_file(MODELS_DIR / "stopwords_en.txt"),
+            "vocab": load_text_file(MODELS_DIR / "vocab.txt"),
+            "error": "",
+        }
+    except Exception as error:
+        return {"available": False, "error": str(error)}
+
+ML_ARTIFACTS = load_ml_artifacts()
+
+def class_is_buyer(value):
+    return str(value).strip().lower() in {"1", "true", "buyer", "verified buyer", "yes"}
+
+def get_buyer_probability(model, features):
+    if hasattr(model, "predict_proba"):
+        probabilities = model.predict_proba(features)[0]
+        classes = getattr(model, "classes_", None)
+
+        if classes is not None:
+            for index, class_value in enumerate(classes):
+                if class_is_buyer(class_value):
+                    return float(probabilities[index])
+
+        return float(probabilities[-1])
+
+    if hasattr(model, "decision_function"):
+        np = ML_ARTIFACTS["np"]
+        score = float(model.decision_function(features)[0])
+        return float(1 / (1 + np.exp(-score)))
+
+    prediction = model.predict(features)[0]
+    return 1.0 if class_is_buyer(prediction) else 0.0
+
+def get_glove_size(glove_dict):
+    for vector in glove_dict.values():
+        return len(vector)
+
+    return 100
+
+def preprocess_review_text(text, stopwords):
+    return [
+        word for word in normalize_text(text).split()
+        if len(word) >= 2 and word not in stopwords
+    ]
+
+def review_text_to_glove_vector(text):
+    np = ML_ARTIFACTS["np"]
+    glove_dict = ML_ARTIFACTS["glove_dict"]
+    stopwords = ML_ARTIFACTS["stopwords"]
+    vocab = ML_ARTIFACTS["vocab"]
+    embedding_size = get_glove_size(glove_dict)
+    tokens = preprocess_review_text(text, stopwords)
+    vectors = []
+
+    for token in tokens:
+        if vocab and token not in vocab:
+            continue
+
+        if token in glove_dict:
+            vectors.append(np.asarray(glove_dict[token], dtype=float))
+
+    if not vectors:
+        return np.zeros((1, embedding_size))
+
+    return np.mean(vectors, axis=0).reshape(1, -1)
+
+def predict_review_with_models(review_title, review_text, product):
+    if not ML_ARTIFACTS["available"]:
+        raise RuntimeError(
+            "ML models could not be loaded. Install requirements and check model files. "
+            f"Original error: {ML_ARTIFACTS['error']}"
+        )
+
+    desc_features = review_text_to_glove_vector(review_text)
+    title_features = ML_ARTIFACTS["title_tfidf"].transform([review_title])
+    numeric_features = [[product["price"], product["avg_product_rating"]]]
+
+    prob_desc = get_buyer_probability(ML_ARTIFACTS["model_desc"], desc_features)
+    prob_title = get_buyer_probability(ML_ARTIFACTS["model_title"], title_features)
+    prob_num = get_buyer_probability(ML_ARTIFACTS["model_num"], numeric_features)
+    final_probability = (prob_desc + prob_title + prob_num) / 3.0
+    predicted_label = "Verified Buyer" if final_probability >= 0.5 else "Guest User"
+    confidence = final_probability if predicted_label == "Verified Buyer" else 1 - final_probability
+
+    return {
+        "prob_desc": prob_desc,
+        "prob_title": prob_title,
+        "prob_num": prob_num,
+        "final_probability": final_probability,
+        "predicted_label": predicted_label,
+        "predicted_binary": 1 if predicted_label == "Verified Buyer" else 0,
+        "confidence": confidence,
+    }
+
+def predict_buyer_status(review_title, review_text, rating, product=None):
     """
-    Dynamic heuristic keyword model simulating predictive intelligence.
-    Analyzes content markers to flag promotional signals vs genuine purchases.
+    Return the binary prediction used by the admin telemetry.
+    Uses the real ML ensemble when product metadata is available.
     """
+    if product is not None and ML_ARTIFACTS["available"]:
+        return predict_review_with_models(review_title, review_text, product)["predicted_binary"]
+
     full_text = f"{review_title} {review_text}".lower()
     buyer_signals = ['buy', 'buying', 'bought', 'delivery', 'shipped', 'package', 'worth', 'oil control', 'matte', 'pigmented']
     promotional_signals = ['ad', 'sponsored', 'free sample', 'promotion', 'gifted', 'sticky']
@@ -310,12 +489,19 @@ def initialize_review_logs():
     then adds dummy filler rows if totals are under 11 to immediately demo page pagination.
     """
     global review_logs
+    ensure_reviews_file_schema()
     review_logs = []
     historical_reviews = load_all_reviews()
+    product_map = {product["id"]: product for product in load_products()}
     
     for r in historical_reviews:
-        pred = predict_buyer_status(r["review_title"], r["review_text"], r["review_rating"])
-        actual = 1 if r["is_a_buyer"] == "Verified Buyer" else 0
+        pred = predict_buyer_status(
+            r["review_title"],
+            r["review_text"],
+            r["review_rating"],
+            product_map.get(r["product_id"]),
+        )
+        actual = buyer_status_to_binary(r["is_a_buyer"])
         review_logs.append({
             "transaction_id": r["review_id"] if r["review_id"] > 0 else 1000 + len(review_logs),
             "title": r["review_title"],
@@ -405,46 +591,87 @@ def product_detail(id):
 
 @app.route("/review/<int:id>", methods=["GET", "POST"])
 def create_review(id):
+    product = find_product(id)
+    if product is None:
+        abort(404)
+
+    form_data = {
+        "review_title": "",
+        "review_text": "",
+        "review_rating": "5",
+    }
+    prediction = None
+    error_message = ""
+
     if request.method == "POST":
-        title = request.form.get("review_title", "").strip()
-        text = request.form.get("review_text", "").strip()
-        rating = request.form.get("review_rating", "5")
-        is_buyer_override = request.form.get("is_a_buyer", "True")
-        buyer_status = "Verified Buyer" if is_buyer_override == "True" else "Guest User"
+        step = request.form.get("step", "predict")
+        form_data = {
+            "review_title": request.form.get("review_title", "").strip(),
+            "review_text": request.form.get("review_text", "").strip(),
+            "review_rating": request.form.get("review_rating", "5"),
+        }
+        title = form_data["review_title"]
+        text = form_data["review_text"]
+        rating = form_data["review_rating"]
 
-        current_user_id = session.get("user_id", 0)
-        existing_reviews = load_all_reviews()
-        next_review_id = len(existing_reviews) + 1
+        if not title:
+            error_message = "Please enter a review title."
+        elif len(text) < 10:
+            error_message = "Please enter a review description with at least 10 characters."
+        elif safe_int(rating, 0) not in {1, 2, 3, 4, 5}:
+            error_message = "Please select a valid rating from 1 to 5."
 
-        needs_newline = False
-        if os.path.exists(REVIEWS_CSV) and os.stat(REVIEWS_CSV).st_size > 0:
-            with open(REVIEWS_CSV, "rb") as f:
-                f.seek(-1, os.SEEK_END)
-                if f.read(1) != b"\n":
-                    needs_newline = True
+        if error_message:
+            return render_template(
+                "review.html",
+                product=product,
+                form_data=form_data,
+                prediction=prediction,
+                error_message=error_message,
+            )
 
-        # Save record directly to the backend CSV file
-        with open(REVIEWS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
-            if needs_newline:
-                file.write("\n")
-            fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writerow({
-                "review_id": next_review_id,
-                "product_id": id,
-                "user_id": current_user_id,
-                "review_title": title,
-                "review_rating": float(rating),
-                "review_text": text,
-                "is_a_buyer": buyer_status
-            }) 
-    
-        # Run live model processing pipeline updates on the global analytics tracker
-        try:
-            ai_pred_binary = predict_buyer_status(title, text, rating)
-            user_actual_binary = 1 if is_buyer_override == "True" else 0
+        if step == "predict":
+            try:
+                prediction = predict_review_with_models(title, text, product)
+            except RuntimeError as error:
+                error_message = str(error)
+
+            return render_template(
+                "review.html",
+                product=product,
+                form_data=form_data,
+                prediction=prediction,
+                error_message=error_message,
+            )
+
+        if step == "confirm":
+            predicted_label = request.form.get("predicted_label", "")
+            predicted_probability = safe_float(request.form.get("predicted_probability"), 0.0)
+            buyer_status = request.form.get("is_a_buyer", predicted_label or "Guest User")
+            current_user_id = session.get("user_id", 0)
+            existing_reviews = load_all_reviews()
+            next_review_id = max([review["review_id"] for review in existing_reviews] or [0]) + 1
+
+            ensure_reviews_file_schema()
+            with open(REVIEWS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
+                writer = csv.DictWriter(file, fieldnames=REVIEW_FIELDS)
+                writer.writerow({
+                    "review_id": next_review_id,
+                    "product_id": id,
+                    "user_id": current_user_id,
+                    "review_title": title,
+                    "review_rating": float(rating),
+                    "review_text": text,
+                    "is_a_buyer": buyer_status,
+                    "predicted_label": predicted_label,
+                    "predicted_probability": f"{predicted_probability:.4f}",
+                    "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                })
+
+            ai_pred_binary = buyer_status_to_binary(predicted_label)
+            user_actual_binary = buyer_status_to_binary(buyer_status)
             is_overridden = (ai_pred_binary != user_actual_binary)
-            
+
             review_logs.append({
                 "transaction_id": 1001 + len(review_logs),
                 "title": title if title else "Untitled Review",
@@ -452,13 +679,29 @@ def create_review(id):
                 "actual": user_actual_binary,
                 "overridden": is_overridden
             })
-            print(f"📈 Telemetry logged! Streaming matrix total items: {len(review_logs)}")
-        except Exception as telemetry_error:
-            print(f"⚠️ Telemetry failure log exception mapping entry: {telemetry_error}")
 
-        return redirect(url_for("product_detail", id=id))
+            return redirect(url_for("product_detail", id=id))
 
-    return render_template("review.html", prediction_label="Verified Buyer")
+    return render_template(
+        "review.html",
+        product=product,
+        form_data=form_data,
+        prediction=prediction,
+        error_message=error_message,
+    )
+
+@app.route("/reviews/<int:review_id>")
+def review_detail(review_id):
+    review = next((item for item in load_all_reviews() if item["review_id"] == review_id), None)
+    if review is None:
+        abort(404)
+
+    product = find_product(review["product_id"])
+    users = load_all_users()
+    user_map = {str(user["user_id"]): user["username"] for user in users}
+    review["reviewer_name"] = user_map.get(str(review.get("user_id", 0)), "Anonymous Guest")
+
+    return render_template("review_detail.html", review=review, product=product)
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():

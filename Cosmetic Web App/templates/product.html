@@ -76,7 +76,11 @@
         {% if reviews and reviews|length > 0 %}
             {% for review in reviews %}
             <div class="review-card" style="border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 6px;">
-                <h3 style="margin-top: 0;">{{ review['review_title'] if 'review_title' in review else 'No Title' }}</h3>
+                <h3 style="margin-top: 0;">
+                    <a href="/reviews/{{ review['review_id'] if 'review_id' in review else 0 }}" style="color: inherit; text-decoration: none;">
+                        {{ review['review_title'] if 'review_title' in review else 'No Title' }}
+                    </a>
+                </h3>
 
                 <p class="review-author" style="font-size: 13px; color: #555; margin-bottom: 5px;">
                     By: <strong>{{ review['reviewer_name'] if 'reviewer_name' in review else 'Anonymous Guest' }}</strong>
@@ -95,6 +99,15 @@
                 <span class="buyer-label {{ status_class }}">
                     {{ buyer_status }}
                 </span>
+
+                {% if review.get('predicted_label') %}
+                <p style="font-size: 13px; color: #666; margin-top: 10px;">
+                    AI prediction: {{ review['predicted_label'] }}
+                    {% if review.get('predicted_probability') %}
+                    ({{ '%.1f'|format(review['predicted_probability'] * 100) }}% Buyer probability)
+                    {% endif %}
+                </p>
+                {% endif %}
             </div>
             {% endfor %}
         {% else %}

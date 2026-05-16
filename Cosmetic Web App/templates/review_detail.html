@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ review.review_title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <nav class="navbar" style="display: flex; justify-content: space-between; align-items: center; padding: 22px 60px; border-bottom: 1px solid #eeeeee; background: white;">
+        <a href="/" class="logo" style="font-size: 28px; font-weight: 700; letter-spacing: 1px; color: #111111; text-decoration: none;">GlowHaus</a>
+        {% if product %}
+        <a href="/product/{{ product.id }}" style="color: #111111; text-decoration: none;">Back to product</a>
+        {% endif %}
+    </nav>
+
+    <section class="review-form-container">
+        <h2>{{ review.review_title }}</h2>
+
+        {% if product %}
+        <p style="color: #666; margin-bottom: 25px;">{{ product.product_name }}</p>
+        {% endif %}
+
+        <div class="review-card" style="border: 1px solid #eee; padding: 20px; border-radius: 6px;">
+            <p style="font-size: 13px; color: #555;">By: <strong>{{ review.reviewer_name }}</strong></p>
+            <p class="review-rating" style="font-weight: bold; color: #f39c12;">Rating: {{ review.review_rating }} ⭐</p>
+            <p>{{ review.review_text }}</p>
+
+            <span class="buyer-label">
+                {{ review.is_a_buyer }}
+            </span>
+
+            {% if review.predicted_label %}
+            <p style="font-size: 13px; color: #666; margin-top: 12px;">
+                AI prediction: {{ review.predicted_label }}
+                ({{ '%.1f'|format(review.predicted_probability * 100) }}% Buyer probability)
+            </p>
+            {% endif %}
+
+            {% if review.created_at %}
+            <p style="font-size: 13px; color: #888; margin-top: 8px;">Created at: {{ review.created_at }}</p>
+            {% endif %}
+        </div>
+    </section>
+
+</body>
+</html>
