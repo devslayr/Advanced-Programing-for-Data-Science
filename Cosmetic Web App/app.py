@@ -7,7 +7,6 @@ from math import sqrt
 from pathlib import Path
 
 from flask import Flask, render_template, request, abort, redirect, url_for, session, flash
-from models.predictor import predict_review
 
 app = Flask(__name__)
 app.secret_key = "glowhaus_secure_key_secret_cho_session"  # Securely encrypts sessions
@@ -233,8 +232,8 @@ def load_all_reviews():
     if not os.path.exists(REVIEWS_CSV):
         return reviews
 
-    # Explicit layout matching the updated headerless data format perfectly
-    fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer", "model_prediction"]
+    # Explicit layout matching the headerless data format perfectly
+    fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
     with open(REVIEWS_CSV, mode="r", encoding="utf-8-sig") as file:
         reader = csv.DictReader(file, fieldnames=fieldnames)
         for row in reader:
@@ -245,9 +244,7 @@ def load_all_reviews():
                 "review_title": row.get("review_title", "No Title"),
                 "review_rating": safe_float(row.get("review_rating"), 0.0),
                 "review_text": row.get("review_text", ""),
-                "is_a_buyer": row.get("is_a_buyer", "Guest User").strip(),
-                # Read the stored prediction field, defaulting to 1 (Buyer) for old historic records
-                "model_prediction": safe_int(row.get("model_prediction"), 1)
+                "is_a_buyer": row.get("is_a_buyer", "Guest User").strip()
             })
     return reviews
 
@@ -288,35 +285,61 @@ def save_new_user(username, password, email):
 # =========================================================================
 # MACHINE LEARNING CLASSIFICATION & TELEMETRY INITIALIZATION ENGINE
 # =========================================================================
+def predict_buyer_status(review_title, review_text, rating):
+    """
+    Dynamic heuristic keyword model simulating predictive intelligence.
+    Analyzes content markers to flag promotional signals vs genuine purchases.
+    """
+    full_text = f"{review_title} {review_text}".lower()
+    buyer_signals = ['buy', 'buying', 'bought', 'delivery', 'shipped', 'package', 'worth', 'oil control', 'matte', 'pigmented']
+    promotional_signals = ['ad', 'sponsored', 'free sample', 'promotion', 'gifted', 'sticky']
+    
+    buyer_score = sum(1 for word in buyer_signals if word in full_text)
+    promo_score = sum(1 for word in promotional_signals if word in full_text)
+    
+    if safe_float(rating) >= 4.0:
+        buyer_score += 1
+        
+    if promo_score > buyer_score:
+        return 0  # Non-Buyer Prediction
+    return 1  # Buyer Prediction
 
 def initialize_review_logs():
     """
-    Populates global review_logs dynamically from historical reviews.csv file data
-    using the pre-stored prediction attributes.
+    Populates global review_logs dynamically from historical reviews.csv file data,
+    then adds dummy filler rows if totals are under 11 to immediately demo page pagination.
     """
     global review_logs
     review_logs = []
     historical_reviews = load_all_reviews()
     
     for r in historical_reviews:
-        # Pull the stored prediction column we added to load_all_reviews()
-        # Defaulting safely to 1 if an old record somehow lacks it
-        pred = int(r.get("model_prediction", 1))
-            
+        pred = predict_buyer_status(r["review_title"], r["review_text"], r["review_rating"])
         actual = 1 if r["is_a_buyer"] == "Verified Buyer" else 0
-        
-        # Fixed transaction_id alignment to match your exact sequential row ID
         review_logs.append({
-            "transaction_id": r["review_id"] if r["review_id"] > 0 else len(review_logs) + 1,
+            "transaction_id": r["review_id"] if r["review_id"] > 0 else 1000 + len(review_logs),
             "title": r["review_title"],
             "predicted": pred,
             "actual": actual,
             "overridden": (pred != actual)
         })
+        
+    # SEEDING BLOCK: Guarantees your table shows multiple pages right away if data is sparse
+    if len(review_logs) < 11:
+        mock_samples = [
+            {"transaction_id": 101, "title": "Sponsored: decent product", "predicted": 0, "actual": 0, "overridden": False},
+            {"transaction_id": 102, "title": "Received free promotional item", "predicted": 0, "actual": 0, "overridden": False},
+            {"transaction_id": 103, "title": "Influenster sample review", "predicted": 0, "actual": 1, "overridden": True},
+            {"transaction_id": 104, "title": "Great hydration booster", "predicted": 1, "actual": 1, "overridden": False},
+            {"transaction_id": 105, "title": "Bait ad link click tracker", "predicted": 0, "actual": 0, "overridden": False},
+            {"transaction_id": 106, "title": "Ad: Glowing serum experience", "predicted": 0, "actual": 0, "overridden": False},
+            {"transaction_id": 107, "title": "Gifted by brand for evaluation", "predicted": 0, "actual": 0, "overridden": False},
+            {"transaction_id": 108, "title": "Highly recommend to everyone", "predicted": 1, "actual": 1, "overridden": False},
+        ]
+        review_logs.extend(mock_samples)
 
 # Run initial boot configuration parameters loading process
 initialize_review_logs()
-
 
 # =========================================================================
 # FLASK WEB SERVER ROUTING INTERFACES
@@ -386,20 +409,12 @@ def create_review(id):
         title = request.form.get("review_title", "").strip()
         text = request.form.get("review_text", "").strip()
         rating = request.form.get("review_rating", "5")
-        buyer_status = request.form.get("is_a_buyer", "Verified Buyer").strip()
+        is_buyer_override = request.form.get("is_a_buyer", "True")
+        buyer_status = "Verified Buyer" if is_buyer_override == "True" else "Guest User"
 
         current_user_id = session.get("user_id", 0)
         existing_reviews = load_all_reviews()
         next_review_id = len(existing_reviews) + 1
-
-        # Evaluate the keyword check rule
-        clean_title_input = title.lower().strip() if title else "untitled review"
-        raw_model_output = predict_review(clean_title_input)
-        
-        if "sponsored" in clean_title_input or "ad link" in clean_title_input or "promo" in clean_title_input:
-            final_predicted_binary = 0  # Force Anomaly / Non-Buyer
-        else:
-            final_predicted_binary = int(raw_model_output)
 
         needs_newline = False
         if os.path.exists(REVIEWS_CSV) and os.stat(REVIEWS_CSV).st_size > 0:
@@ -408,70 +423,42 @@ def create_review(id):
                 if f.read(1) != b"\n":
                     needs_newline = True
 
-        # Write to CSV including the NEW 'model_prediction' field
+        # Save record directly to the backend CSV file
         with open(REVIEWS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
             if needs_newline:
                 file.write("\n")
-            # Added 'model_prediction' to the end of fieldnames
-            fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer", "model_prediction"]
+            fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             writer.writerow({
                 "review_id": next_review_id,
                 "product_id": id,
                 "user_id": current_user_id,
-                "review_title": title if title else "Untitled Review",
+                "review_title": title,
                 "review_rating": float(rating),
                 "review_text": text,
-                "is_a_buyer": buyer_status,
-                "model_prediction": final_predicted_binary  # Stored safely in your database!
+                "is_a_buyer": buyer_status
             }) 
     
+        # Run live model processing pipeline updates on the global analytics tracker
         try:
-            user_actual_binary = 1 if buyer_status == "Verified Buyer" else 0
-            is_overridden = (final_predicted_binary != user_actual_binary)
+            ai_pred_binary = predict_buyer_status(title, text, rating)
+            user_actual_binary = 1 if is_buyer_override == "True" else 0
+            is_overridden = (ai_pred_binary != user_actual_binary)
             
             review_logs.append({
-                "transaction_id": next_review_id,
+                "transaction_id": 1001 + len(review_logs),
                 "title": title if title else "Untitled Review",
-                "predicted": final_predicted_binary,  
+                "predicted": ai_pred_binary,
                 "actual": user_actual_binary,
                 "overridden": is_overridden
             })
+            print(f"📈 Telemetry logged! Streaming matrix total items: {len(review_logs)}")
         except Exception as telemetry_error:
-            print(f"⚠️ Telemetry log assignment error: {telemetry_error}")
+            print(f"⚠️ Telemetry failure log exception mapping entry: {telemetry_error}")
 
         return redirect(url_for("product_detail", id=id))
 
     return render_template("review.html", prediction_label="Verified Buyer")
-
-
-@app.route("/api/predict-title", methods=["POST"])
-def api_predict_title():
-    data = request.get_json() or {}
-    title = data.get("title", "").strip()
-    
-    if not title:
-        return {"prediction": "Awaiting dynamic calculation tokens..."}
-        
-    try:
-        ai_pred_binary = predict_review(title)
-        clean_title = title.lower()
-        
-        if "sponsored" in clean_title or "ad link" in clean_title or "promo" in clean_title:
-            label = "Guest User / Anomaly Detected"
-        elif int(ai_pred_binary) == 1:
-            label = "Verified Buyer"
-        else:
-            label = "Guest User / Anomaly Detected"
-            
-        print(f"🚀 SENDING TO FRONTEND -> '{label}'")
-        
-    except Exception as e:
-        print(f"❌ Minor API exception: {e}")
-        label = "Verified Buyer"
-        
-    return {"prediction": label}
-
 
 @app.route("/signup", methods=["GET", "POST"])
 def signup():
