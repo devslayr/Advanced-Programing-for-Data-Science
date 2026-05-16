@@ -11,6 +11,30 @@
 
     <nav class="navbar">
         <a href="/" class="logo">GlowHaus</a>
+
+        <form class="search-bar" method="GET" action="/search">
+            <input
+                type="text"
+                name="query"
+                placeholder="Search beauty products, brands..."
+                value="{{ query }}"
+            >
+            <button type="submit">Search</button>
+        </form>
+
+        <div class="nav-links">
+            <a href="#">New In</a>
+            <a href="#">Brands</a>
+            
+            <!-- User session tracking block -->
+            {% if session.username %}
+                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px;">Hello, {{ session.username }}!</span>
+                <a href="/logout" style="color: #e74c3c;">Log Out</a>
+            {% else %}
+                <a href="/login">Log In</a>
+                <a href="/signup" style="font-weight: 600;">Sign Up</a>
+            {% endif %}
+        </div>
     </nav>
 
 
@@ -60,6 +84,12 @@
         {% for review in reviews %}
         <div class="review-card">
             <h3>{{ review.review_title }}</h3>
+            
+            <!-- Display the linked user's name here -->
+            <p class="review-author" style="font-size: 13px; color: #555; margin-bottom: 5px;">
+                By: <strong>{{ review.reviewer_name }}</strong>
+            </p>
+
             <p class="review-rating">Rating: {{ review.review_rating }}</p>
             <p>{{ review.review_text }}</p>
             <span class="buyer-label">{{ review.is_a_buyer }}</span>

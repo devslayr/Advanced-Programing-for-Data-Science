@@ -28,8 +28,15 @@
         <div class="nav-links">
             <a href="#">New In</a>
             <a href="#">Brands</a>
-            <a href="#">Skincare</a>
-            <a href="#">Makeup</a>
+            
+            <!-- User session tracking block -->
+            {% if session.username %}
+                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px;">Hello, {{ session.username }}!</span>
+                <a href="/logout" style="color: #e74c3c;">Log Out</a>
+            {% else %}
+                <a href="/login">Log In</a>
+                <a href="/signup" style="font-weight: 600;">Sign Up</a>
+            {% endif %}
         </div>
     </nav>
 

@@ -6,7 +6,8 @@ from difflib import SequenceMatcher
 from math import sqrt
 from pathlib import Path
 
-from flask import Flask, render_template, request, abort, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
@@ -445,6 +446,51 @@ def load_all_reviews():
             })
     return reviews
 
+# Đường dẫn tới file người dùng
+USERS_CSV = os.path.join("data", "users.csv")
+app.secret_key = "glowhaus_secret_key_secret_cho_session" # Cần có dòng này để dùng được session/flash message
+
+def load_all_users():
+    """Reads the entire user list from the CSV file."""
+    users = []
+    if not os.path.exists(USERS_CSV):
+        return users
+    with open(USERS_CSV, mode="r", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            users.append(row)
+    return users
+
+def save_new_user(username, password, email):
+    """Saves a new user with a plain text password into the CSV file."""
+    existing_users = load_all_users()
+    next_id = len(existing_users) + 1
+    
+    # Check if the last line of the file lacks a trailing newline character
+    needs_newline = False
+    if os.path.exists(USERS_CSV) and os.stat(USERS_CSV).st_size > 0:
+        with open(USERS_CSV, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                needs_newline = True
+
+    with open(USERS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
+        if needs_newline:
+            file.write("\n")
+            
+        fieldnames = ["user_id", "username", "password_hash", "email"]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        
+        if os.stat(USERS_CSV).st_size == 0:
+            writer.writeheader()
+            
+        writer.writerow({
+            "user_id": next_id,
+            "username": username,
+            "password_hash": password,  # Plain text for quick demo validation
+            "email": email
+        })
+
 
 @app.route("/")
 def home():
@@ -527,30 +573,34 @@ def search():
         if query else f"Showing {result_count} cosmetics and beauty products."
     )
 
-
 @app.route("/product/<int:id>")
 def product_detail(id):
     products = load_products()
-
-    # Find the requested product
-    product = None
-    for item in products:
-        if item["id"] == id:
-            product = item
-            break
+    product = next((item for item in products if item["id"] == id), None)
 
     if product is None:
         abort(404)
 
-    # 1. Load all raw reviews from our new CSV file
+    # Load all reviews and all users
     all_reviews = load_all_reviews()
+    all_users = load_all_users() # Uses your existing load_all_users() function
 
-    # 2. Filter out reviews that don't belong to this product ID
-    matched_reviews = [r for r in all_reviews if r["product_id"] == id]
+    # Create a quick dictionary mapping user_id -> username for fast lookups
+    user_map = {str(u["user_id"]): u["username"] for u in all_users}
+
+    matched_reviews = []
+    for r in all_reviews:
+        if r["product_id"] == id:
+            # Look up the username using the review's user_id
+            review_user_id = str(r.get("user_id", 0))
+            reviewer_name = user_map.get(review_user_id, "Anonymous Guest")
+            
+            # Attach the author's name dynamically to the review dictionary
+            r["reviewer_name"] = reviewer_name
+            matched_reviews.append(r)
 
     recommendations = get_similar_products(products, product)
 
-    # 3. Pass the dynamic list of reviews down to your template
     return render_template(
         "product.html",
         product=product,
@@ -570,10 +620,13 @@ def create_review(id):
         is_buyer_override = request.form.get("is_a_buyer", "True")
         buyer_status = "Verified Buyer" if is_buyer_override == "True" else "Guest User"
 
+        # --- NEW: Get the logged-in user's ID from the session ---
+        # Defaults to 0 if the user is a guest / logged out
+        current_user_id = session.get("user_id", 0)
+
         existing_reviews = load_all_reviews()
         next_review_id = len(existing_reviews) + 1
 
-        # Check if the file exists and if its last character is a newline
         needs_newline = False
         if os.path.exists(REVIEWS_CSV) and os.stat(REVIEWS_CSV).st_size > 0:
             with open(REVIEWS_CSV, "rb") as f:
@@ -581,13 +634,12 @@ def create_review(id):
                 if f.read(1) != b"\n":
                     needs_newline = True
 
-        # Open in append mode
         with open(REVIEWS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
-            # If the file didn't end cleanly, inject a quick newline first
             if needs_newline:
                 file.write("\n")
 
-            fieldnames = ["review_id", "product_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
+            # Added 'user_id' to fieldnames
+            fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
             writer = csv.DictWriter(file, fieldnames=fieldnames)
             
             if os.stat(REVIEWS_CSV).st_size == 0:
@@ -596,6 +648,7 @@ def create_review(id):
             writer.writerow({
                 "review_id": next_review_id,
                 "product_id": id,
+                "user_id": current_user_id,  # <-- SAVES THE USER ID HERE
                 "review_title": title,
                 "review_rating": float(rating),
                 "review_text": text,
@@ -605,6 +658,59 @@ def create_review(id):
         return redirect(url_for("product_detail", id=id))
 
     return render_template("review.html", prediction_label=prediction_label)
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        
+        users = load_all_users()
+        
+        # Check if username or email already exists
+        if any(u["username"].lower() == username.lower() for u in users):
+            flash("Username is already taken!", "error")
+            return redirect(url_for("signup"))
+            
+        if any(u["email"].lower() == email.lower() for u in users):
+            flash("This email is already registered!", "error")
+            return redirect(url_for("signup"))
+            
+        save_new_user(username, password, email)
+        flash("Registration successful! Please log in.", "success")
+        return redirect(url_for("login"))
+        
+    return render_template("signup.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        
+        users = load_all_users()
+        user = next((u for u in users if u["username"].lower() == username.lower()), None)
+        
+        # Plain text comparison
+        if user and user["password_hash"] == password:
+            session["user_id"] = user["user_id"]
+            session["username"] = user["username"]
+            flash(f"Welcome back, {user['username']}!", "success")
+            return redirect(url_for("home"))
+        else:
+            flash("Invalid username or password!", "error")
+            return redirect(url_for("login"))
+            
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out successfully.", "success")
+    return redirect(url_for("home"))
 
 
 if __name__ == "__main__":
