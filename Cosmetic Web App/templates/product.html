@@ -3,135 +3,129 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ product.product_name }}</title>
-
+    <title>{{ product['product_name'] if product and 'product_name' in product else 'Product Details' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
 
-    <nav class="navbar">
-        <a href="/" class="logo">GlowHaus</a>
+    <nav class="navbar" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid #eee;">
+        <a href="/" class="logo" style="font-weight: 700; font-size: 1.5rem; text-decoration: none; color: #000;">GlowHaus</a>
 
-        <form class="search-bar" method="GET" action="/search">
+        <form class="search-bar" method="GET" action="/search" style="display: flex; flex-grow: 0.5; margin: 0 20px;">
             <input
                 type="text"
                 name="query"
                 placeholder="Search beauty products, brands..."
-                value="{{ query }}"
+                value="{{ query or '' }}"
+                style="width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 4px 0 0 4px; outline: none;"
             >
-            <button type="submit">Search</button>
+            <button type="submit" style="padding: 8px 16px; background-color: #333; color: #fff; border: none; border-radius: 0 4px 4px 0; cursor: pointer;">Search</button>
         </form>
 
-        <div class="nav-links">
-            <a href="#">New In</a>
-            <a href="#">Brands</a>
+        <div class="nav-links" style="display: flex; align-items: center; gap: 15px;">
+            <a href="/" style="text-decoration: none; color: #333;">Home</a>
             
-            <!-- User session tracking block -->
-            {% if session.username %}
-                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px;">Hello, {{ session.username }}!</span>
-                <a href="/logout" style="color: #e74c3c;">Log Out</a>
+            {% if session and session.get('username') %}
+                <span class="user-greeting" style="font-weight: 600; color: #333;">Hello, {{ session.get('username') }}!</span>
+                <a href="/logout" style="color: #e74c3c; text-decoration: none;">Log Out</a>
             {% else %}
-                <a href="/login">Log In</a>
-                <a href="/signup" style="font-weight: 600;">Sign Up</a>
+                <a href="/login" style="text-decoration: none; color: #333;">Log In</a>
+                <a href="/signup" style="font-weight: 600; text-decoration: none; color: #333;">Sign Up</a>
             {% endif %}
+
+            <a href="/admin/login" style="padding: 6px 14px; background-color: #000; color: #fff; border-radius: 4px; text-decoration: none; font-weight: 500; font-size: 0.85rem; margin-left: 5px;">Admin Portal</a>
         </div>
     </nav>
 
-
-    <section class="product-detail-container">
-
+    {% if product %}
+    <section class="product-detail-container" style="margin-top: 30px;">
         <div class="product-detail-image">
-            <img src="{{ product.image }}" alt="{{ product.product_name }}">
+            <img src="{{ product['image'] if 'image' in product else '' }}" alt="{{ product['product_name'] if 'product_name' in product else 'Product' }}">
         </div>
 
-
         <div class="product-detail-info">
-
-            <p class="detail-brand">{{ product.brand_name }}</p>
-
-            <h1>{{ product.product_name }}</h1>
-
-            <p class="detail-price">Rs. {{ product.price }}</p>
-
-            <p class="detail-rating">
-                Rating: {{ product.avg_product_rating }}
-            </p>
-
+            <p class="detail-brand">{{ product['brand_name'] if 'brand_name' in product else 'Generic Brand' }}</p>
+            <h1>{{ product['product_name'] if 'product_name' in product else 'Untitled Product' }}</h1>
+            <p class="detail-price">Rs. {{ product['price'] if 'price' in product else '0.00' }}</p>
+            <p class="detail-rating">Rating: {{ product['avg_product_rating'] if 'avg_product_rating' in product else '0.0' }} / 5.0</p>
+            
             <p class="detail-description">
-                {{ product.description }}
+                {{ product['description'] if 'description' in product else 'No description available for this beauty selection.' }}
             </p>
 
-            {% if product.product_url %}
-            <a href="{{ product.product_url }}" target="_blank" rel="noopener" class="source-link">
+            {% if product and product.get('product_url') %}
+            <a href="{{ product['product_url'] }}" target="_blank" rel="noopener" class="source-link">
                 View original product
             </a>
             {% endif %}
 
-            <a href="/review/{{ product.id }}">
-                <button class="review-btn">
-                    Write Review
-                </button>
-            </a>
-
+            <div style="margin-top: 20px;">
+                <a href="/review/{{ product['id'] if 'id' in product else 0 }}">
+                    <button class="review-btn">Write Review</button>
+                </a>
+            </div>
         </div>
-
     </section>
-
+    {% else %}
+    <p class="empty-state" style="text-align: center; margin: 40px 0;">Product parameters failed to initialize completely.</p>
+    {% endif %}
 
     <section class="reviews-section">
         <h2>Customer Reviews</h2>
 
-        {% for review in reviews %}
-        <div class="review-card">
-            <h3>{{ review.review_title }}</h3>
-            
-            <!-- Display the linked user's name here -->
-            <p class="review-author" style="font-size: 13px; color: #555; margin-bottom: 5px;">
-                By: <strong>{{ review.reviewer_name }}</strong>
-            </p>
+        {% if reviews and reviews|length > 0 %}
+            {% for review in reviews %}
+            <div class="review-card" style="border: 1px solid #eee; padding: 15px; margin-bottom: 15px; border-radius: 6px;">
+                <h3 style="margin-top: 0;">{{ review['review_title'] if 'review_title' in review else 'No Title' }}</h3>
 
-            <p class="review-rating">Rating: {{ review.review_rating }}</p>
-            <p>{{ review.review_text }}</p>
-            <span class="buyer-label">{{ review.is_a_buyer }}</span>
-        </div>
+                <p class="review-author" style="font-size: 13px; color: #555; margin-bottom: 5px;">
+                    By: <strong>{{ review['reviewer_name'] if 'reviewer_name' in review else 'Anonymous Guest' }}</strong>
+                </p>
+
+                <p class="review-rating" style="font-weight: bold; color: #f39c12;">Rating: {{ review['review_rating'] if 'review_rating' in review else '5.0' }} ⭐</p>
+                <p>{{ review['review_text'] if 'review_text' in review else '' }}</p>
+                
+                {% set buyer_status = review['is_a_buyer'] if 'is_a_buyer' in review else 'Guest User' %}
+                {% if buyer_status == 'Verified Buyer' %}
+                    {% set status_class = 'status-verified' %}
+                {% else %}
+                    {% set status_class = 'status-guest' %}
+                {% endif %}
+
+                <span class="buyer-label {{ status_class }}">
+                    {{ buyer_status }}
+                </span>
+            </div>
+            {% endfor %}
         {% else %}
-        <!-- This block fires automatically if matched_reviews is empty -->
-        <p class="empty-state">No reviews yet for this product.</p>
-        {% endfor %}
+            <p class="empty-state">No reviews yet for this product. Be the first to leave your feedback!</p>
+        {% endif %}
     </section>
-
 
     <section class="recommend-section">
-
         <h2>You May Also Like</h2>
-
         <div class="recommend-grid">
-
-            {% for item in recommendations %}
-
-            <a href="/product/{{ item.id }}" class="product-card-link">
-
-                <div class="recommend-card">
-                    <img src="{{ item.image }}" alt="{{ item.product_name }}">
-
-                    <p class="brand-name">{{ item.brand_name }}</p>
-
-                    <h4>{{ item.product_name }}</h4>
-
-                    <p class="price">Rs. {{ item.price }}</p>
-                </div>
-
-            </a>
-
+            {% if recommendations and recommendations|length > 0 %}
+                {% for item in recommendations %}
+                <a href="/product/{{ item['id'] if 'id' in item else 0 }}" class="product-card-link">
+                    <div class="recommend-card">
+                        <img src="{{ item['image'] if 'image' in item else '' }}" alt="{{ item['product_name'] if 'product_name' in item else 'Cosmetic Item' }}">
+                        <p class="brand-name">{{ item['brand_name'] if 'brand_name' in item else 'Brand' }}</p>
+                        <h4>{{ item['product_name'] if 'product_name' in item else 'Untitled' }}</h4>
+                        <p class="price">Rs. {{ item['price'] if 'price' in item else '0.00' }}</p>
+                    </div>
+                </a>
+                {% endfor %}
             {% else %}
-
-            <p class="empty-state">No recommendations available.</p>
-
-            {% endfor %}
-
+                <p class="empty-state">No recommendations available.</p>
+            {% endif %}
         </div>
-
     </section>
+
+    <footer style="text-align: center; padding: 20px 0; margin-top: 50px; border-top: 1px solid #eee;">
+        <p style="color: #888; font-size: 0.9rem; margin-bottom: 0;">GlowHaus Beauty &copy; 2026</p>
+        <p><a href="/admin/login" style="color: #666; text-decoration: none; font-size: 0.85rem; display: block; margin-top: 5px;">System Management Portal</a></p>
+    </footer>
 
 </body>
 </html>
