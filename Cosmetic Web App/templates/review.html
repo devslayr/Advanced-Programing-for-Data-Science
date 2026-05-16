@@ -65,10 +65,10 @@
                 </select>
             </div>
 
-            <div class="prediction-box" style="background-color: #f9f9f9; padding: 20px; border-radius: 6px; border: 1px solid #eeeeee; margin-bottom: 24px;">
+            <div class="prediction-box" id="prediction-box-container" style="background-color: #f9f9f9; padding: 20px; border-radius: 6px; border: 1px solid #eeeeee; margin-bottom: 24px; transition: all 0.3s ease;">
                 <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; color: #333;">AI Recommendation Prediction</h3>
-                <div class="prediction-result" style="font-size: 16px; font-weight: 700; color: #111111;">
-                    {{ prediction_label or 'Awaiting dynamic calculation tokens...' }}
+                <div id="ai-prediction-result" class="prediction-result" style="font-size: 16px; font-weight: 700; color: #111111; transition: color 0.2s ease;">
+                    Awaiting dynamic calculation tokens...
                 </div>
             </div>
 
@@ -92,6 +92,68 @@
         <p style="color: #111111; font-size: 0.95rem; margin-bottom: 0;">GlowHaus Beauty &copy; 2026</p>
         <p><a href="/admin/login" style="color: #666; text-decoration: none; font-size: 0.85rem; display: block; margin-top: 5px;">System Management Portal</a></p>
     </footer>
+
+    <script>
+        const titleInput = document.getElementById('review_title');
+        const predictionDisplay = document.getElementById('ai-prediction-result');
+        const containerBox = document.getElementById('prediction-box-container');
+        let typingTimer;
+
+        titleInput.addEventListener('input', function() {
+            clearTimeout(typingTimer);
+            
+            // Wait 400ms after the user stops typing to avoid overloading the pipeline server
+            typingTimer = setTimeout(() => {
+                const currentText = titleInput.value.trim();
+                
+                if (currentText.length === 0) {
+                    predictionDisplay.innerText = "Awaiting dynamic calculation tokens...";
+                    predictionDisplay.style.color = "#111111";
+                    containerBox.style.backgroundColor = "#f9f9f9";
+                    containerBox.style.borderColor = "#eeeeee";
+                    return;
+                }
+
+                predictionDisplay.innerText = "Processing matrix...";
+                predictionDisplay.style.color = "#888888";
+
+                // Fetch real-time decision metrics from our live API endpoint
+                fetch('/api/predict-title', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ title: currentText })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    // Normalize the response text for an exact match safety profile
+                    const predictionResult = data.prediction.trim();
+                    predictionDisplay.innerText = predictionResult;
+
+                    // Task 2 Fix: Match against literal text string outputs instead of raw integers
+                    if (predictionResult === "Verified Buyer") {
+                        predictionDisplay.style.color = "#155724"; // Crisp Success Text
+                        containerBox.style.backgroundColor = "#d4edda"; // Light Pastel Green
+                        containerBox.style.borderColor = "#c3e6cb";
+                    } else if (predictionResult === "Guest User / Anomaly Detected") {
+                        predictionDisplay.style.color = "#721c24"; // Crisp Alert Text
+                        containerBox.style.backgroundColor = "#f8d7da"; // Light Pastel Red
+                        containerBox.style.borderColor = "#f5c6cb";
+                    } else {
+                        // Neutral or loading strings
+                        predictionDisplay.style.color = "#111111";
+                        containerBox.style.backgroundColor = "#f9f9f9";
+                        containerBox.style.borderColor = "#eeeeee";
+                    }
+                })
+                .catch(err => {
+                    console.error("ML API Pipeline Error:", err);
+                    predictionDisplay.innerText = "Prediction unavailable";
+                    predictionDisplay.style.color = "#721c24";
+                    containerBox.style.backgroundColor = "#f8d7da";
+                });
+            }, 400);
+        });
+    </script>
 
 </body>
 </html>
