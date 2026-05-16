@@ -429,13 +429,12 @@ def home():
     all_products = load_products()
     
     # 2. Extract unique brands dynamically for the dropdown filter
-    # Using sorted set to avoid duplicates and show them alphabetically
     brands = sorted(list(set(p["brand_name"] for p in all_products if p["brand_name"])))
 
     # 3. Get filter and sort parameters from the URL
     selected_brand = request.args.get("brand", "").strip()
     selected_sort = request.args.get("sort", "").strip()
-    query = request.args.get("query", "").strip() # In case you want to integrate search later
+    query = request.args.get("query", "").strip() 
 
     filtered_products = all_products
 
@@ -452,10 +451,22 @@ def home():
         filtered_products.sort(key=lambda x: x["avg_product_rating"] if x["avg_product_rating"] is not None else 0, reverse=True)
 
     # 6. Build contextual result message
-    result_message = f"Showing {len(filtered_products)} cosmetics and beauty products."
+    result_message = f"Showing {len(filtered_products)} cosmetics and beauty products.\n"
+    
     if selected_brand:
-        result_message += f" Filtered by Brand: {selected_brand}."
+        result_message += f"\nFiltered by Brand: {selected_brand}.\n"
 
+    # 7. Append Sort Status if active
+    sort_labels = {
+        "price_low": "Price: Low to High",
+        "price_high": "Price: High to Low",
+        "rating_high": "Highest Rated"
+    }
+
+    if selected_sort in sort_labels:
+        result_message += f"\nSorted by: {sort_labels[selected_sort]}."
+
+    # 8. Render Template (Properly Indented)
     return render_template(
         "index.html",
         products=filtered_products,

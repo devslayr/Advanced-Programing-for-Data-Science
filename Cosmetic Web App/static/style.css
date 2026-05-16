@@ -122,6 +122,7 @@ body {
 .result-message {
     color: #666666;
     margin-top: 10px;
+    white-space: pre-line;
 }
 
 
@@ -408,4 +409,6 @@ footer {
     background-color: #fff;
     cursor: pointer;
 }
+
+
 
