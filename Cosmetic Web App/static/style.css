@@ -122,6 +122,7 @@ body {
 .result-message {
     color: #666666;
     margin-top: 10px;
+    white-space: pre-line;
 }
 
 
@@ -419,3 +420,84 @@ footer {
         width: 90%;
     }
 }
+<<<<<<< HEAD
+=======
+
+.controls-section {
+    max-width: 1200px;
+    margin: 20px auto;
+    padding: 0 20px;
+}
+
+.controls-section form {
+    display: flex;
+    gap: 20px;
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 8px;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.control-group label {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+    font-size: 14px;
+}
+
+.control-group select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: 'Inter', sans-serif;
+    background-color: #fff;
+    cursor: pointer;
+}
+
+.reviews-section {
+    margin: 40px;
+    padding: 0 20px;
+    font-family: 'Inter', sans-serif;
+}
+
+.review-card {
+    background: #ffffff;
+    border: 1px solid #eaeaea;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+
+.review-card h3 {
+    margin: 0 0 8px 0;
+    font-size: 18px;
+    color: #111;
+}
+
+.review-rating {
+    color: #e67e22;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 12px;
+}
+
+.buyer-label {
+    display: inline-block;
+    margin-top: 10px;
+    font-size: 12px;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #27ae60;
+    background: #e8f8f5;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+
+
+>>>>>>> origin/feat/add-filter

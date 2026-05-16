@@ -1,11 +1,13 @@
 import csv
 import re
+import os
 from collections import Counter
 from difflib import SequenceMatcher
 from math import sqrt
 from pathlib import Path
 
-from flask import Flask, render_template, request, abort
+from flask import Flask, render_template, request, redirect, url_for, session, flash, abort
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
 
@@ -422,17 +424,127 @@ def load_products():
 
     return products
 
+# Define paths (Adjust to match your existing path variables)
+REVIEWS_CSV = os.path.join("data", "reviews.csv")
+
+def load_all_reviews():
+    """Reads all rows from reviews.csv into dictionary objects."""
+    reviews = []
+    if not os.path.exists(REVIEWS_CSV):
+        return reviews
+
+    with open(REVIEWS_CSV, mode="r", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            reviews.append({
+                # Convert to integer so it matches our product ID type safely
+                "product_id": int(row.get("product_id", 0)),
+                "review_title": row.get("review_title", "No Title"),
+                "review_rating": row.get("review_rating", "0.0"),
+                "review_text": row.get("review_text", ""),
+                "is_a_buyer": row.get("is_a_buyer", "Guest User")
+            })
+    return reviews
+
+# Đường dẫn tới file người dùng
+USERS_CSV = os.path.join("data", "users.csv")
+app.secret_key = "glowhaus_secret_key_secret_cho_session" # Cần có dòng này để dùng được session/flash message
+
+def load_all_users():
+    """Reads the entire user list from the CSV file."""
+    users = []
+    if not os.path.exists(USERS_CSV):
+        return users
+    with open(USERS_CSV, mode="r", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            users.append(row)
+    return users
+
+def save_new_user(username, password, email):
+    """Saves a new user with a plain text password into the CSV file."""
+    existing_users = load_all_users()
+    next_id = len(existing_users) + 1
+    
+    # Check if the last line of the file lacks a trailing newline character
+    needs_newline = False
+    if os.path.exists(USERS_CSV) and os.stat(USERS_CSV).st_size > 0:
+        with open(USERS_CSV, "rb") as f:
+            f.seek(-1, os.SEEK_END)
+            if f.read(1) != b"\n":
+                needs_newline = True
+
+    with open(USERS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
+        if needs_newline:
+            file.write("\n")
+            
+        fieldnames = ["user_id", "username", "password_hash", "email"]
+        writer = csv.DictWriter(file, fieldnames=fieldnames)
+        
+        if os.stat(USERS_CSV).st_size == 0:
+            writer.writeheader()
+            
+        writer.writerow({
+            "user_id": next_id,
+            "username": username,
+            "password_hash": password,  # Plain text for quick demo validation
+            "email": email
+        })
+
 
 @app.route("/")
 def home():
-    products = load_products()
+    # 1. Load all products
+    all_products = load_products()
+    
+    # 2. Extract unique brands dynamically for the dropdown filter
+    brands = sorted(list(set(p["brand_name"] for p in all_products if p["brand_name"])))
 
+    # 3. Get filter and sort parameters from the URL
+    selected_brand = request.args.get("brand", "").strip()
+    selected_sort = request.args.get("sort", "").strip()
+    query = request.args.get("query", "").strip() 
+
+    filtered_products = all_products
+
+    # 4. Apply Brand Filter
+    if selected_brand:
+        filtered_products = [p for p in filtered_products if p["brand_name"].lower() == selected_brand.lower()]
+
+    # 5. Apply Sorting
+    if selected_sort == "price_low":
+        filtered_products.sort(key=lambda x: x["price"] if x["price"] is not None else float('inf'))
+    elif selected_sort == "price_high":
+        filtered_products.sort(key=lambda x: x["price"] if x["price"] is not None else float('-inf'), reverse=True)
+    elif selected_sort == "rating_high":
+        filtered_products.sort(key=lambda x: x["avg_product_rating"] if x["avg_product_rating"] is not None else 0, reverse=True)
+
+    # 6. Build contextual result message
+    result_message = f"Showing {len(filtered_products)} cosmetics and beauty products.\n"
+    
+    if selected_brand:
+        result_message += f"\nFiltered by Brand: {selected_brand}.\n"
+
+    # 7. Append Sort Status if active
+    sort_labels = {
+        "price_low": "Price: Low to High",
+        "price_high": "Price: High to Low",
+        "rating_high": "Highest Rated"
+    }
+
+    if selected_sort in sort_labels:
+        result_message += f"\nSorted by: {sort_labels[selected_sort]}."
+
+    # 8. Render Template (Properly Indented)
     return render_template(
         "index.html",
-        products=products,
+        products=filtered_products,
+        brands=brands,
+        selected_brand=selected_brand,
+        selected_sort=selected_sort,
         page_title="Trending Beauty Products",
-        query="",
-        result_message=f"Showing {len(products)} cosmetics and beauty products."
+        query=query,
+        result_message=result_message
     )
 
 
@@ -461,41 +573,144 @@ def search():
         if query else f"Showing {result_count} cosmetics and beauty products."
     )
 
-
 @app.route("/product/<int:id>")
 def product_detail(id):
     products = load_products()
-
-    product = None
-
-    for item in products:
-        if item["id"] == id:
-            product = item
-            break
+    product = next((item for item in products if item["id"] == id), None)
 
     if product is None:
         abort(404)
 
-    reviews = []
+    # Load all reviews and all users
+    all_reviews = load_all_reviews()
+    all_users = load_all_users() # Uses your existing load_all_users() function
+
+    # Create a quick dictionary mapping user_id -> username for fast lookups
+    user_map = {str(u["user_id"]): u["username"] for u in all_users}
+
+    matched_reviews = []
+    for r in all_reviews:
+        if r["product_id"] == id:
+            # Look up the username using the review's user_id
+            review_user_id = str(r.get("user_id", 0))
+            reviewer_name = user_map.get(review_user_id, "Anonymous Guest")
+            
+            # Attach the author's name dynamically to the review dictionary
+            r["reviewer_name"] = reviewer_name
+            matched_reviews.append(r)
 
     recommendations = get_similar_products(products, product)
 
     return render_template(
         "product.html",
         product=product,
-        reviews=reviews,
+        reviews=matched_reviews,
         recommendations=recommendations
     )
 
-
 @app.route("/review/<int:id>", methods=["GET", "POST"])
 def create_review(id):
-    prediction_label = "Buyer"
+    prediction_label = "Verified Buyer"
 
-    return render_template(
-        "review.html",
-        prediction_label=prediction_label
-    )
+    if request.method == "POST":
+        title = request.form.get("review_title", "").strip()
+        text = request.form.get("review_text", "").strip()
+        rating = request.form.get("review_rating", "5")
+        
+        is_buyer_override = request.form.get("is_a_buyer", "True")
+        buyer_status = "Verified Buyer" if is_buyer_override == "True" else "Guest User"
+
+        # --- NEW: Get the logged-in user's ID from the session ---
+        # Defaults to 0 if the user is a guest / logged out
+        current_user_id = session.get("user_id", 0)
+
+        existing_reviews = load_all_reviews()
+        next_review_id = len(existing_reviews) + 1
+
+        needs_newline = False
+        if os.path.exists(REVIEWS_CSV) and os.stat(REVIEWS_CSV).st_size > 0:
+            with open(REVIEWS_CSV, "rb") as f:
+                f.seek(-1, os.SEEK_END)
+                if f.read(1) != b"\n":
+                    needs_newline = True
+
+        with open(REVIEWS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
+            if needs_newline:
+                file.write("\n")
+
+            # Added 'user_id' to fieldnames
+            fieldnames = ["review_id", "product_id", "user_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            
+            if os.stat(REVIEWS_CSV).st_size == 0:
+                writer.writeheader()
+
+            writer.writerow({
+                "review_id": next_review_id,
+                "product_id": id,
+                "user_id": current_user_id,  # <-- SAVES THE USER ID HERE
+                "review_title": title,
+                "review_rating": float(rating),
+                "review_text": text,
+                "is_a_buyer": buyer_status
+            })
+
+        return redirect(url_for("product_detail", id=id))
+
+    return render_template("review.html", prediction_label=prediction_label)
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "")
+        
+        users = load_all_users()
+        
+        # Check if username or email already exists
+        if any(u["username"].lower() == username.lower() for u in users):
+            flash("Username is already taken!", "error")
+            return redirect(url_for("signup"))
+            
+        if any(u["email"].lower() == email.lower() for u in users):
+            flash("This email is already registered!", "error")
+            return redirect(url_for("signup"))
+            
+        save_new_user(username, password, email)
+        flash("Registration successful! Please log in.", "success")
+        return redirect(url_for("login"))
+        
+    return render_template("signup.html")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        
+        users = load_all_users()
+        user = next((u for u in users if u["username"].lower() == username.lower()), None)
+        
+        # Plain text comparison
+        if user and user["password_hash"] == password:
+            session["user_id"] = user["user_id"]
+            session["username"] = user["username"]
+            flash(f"Welcome back, {user['username']}!", "success")
+            return redirect(url_for("home"))
+        else:
+            flash("Invalid username or password!", "error")
+            return redirect(url_for("login"))
+            
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been logged out successfully.", "success")
+    return redirect(url_for("home"))
 
 
 if __name__ == "__main__":

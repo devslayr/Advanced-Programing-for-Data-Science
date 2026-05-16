@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Create Review</title>
-
+    <title>Log In - GlowHaus</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
     <nav class="navbar">
         <a href="/" class="logo">GlowHaus</a>
 
@@ -37,54 +35,27 @@
         </div>
     </nav>
 
-
     <section class="review-form-container">
+        <h1>Welcome Back</h1>
 
-        <h1>Create Review</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, msg in messages %}
+                    <p class="flash-{{ category }}" style="color: #e74c3c; font-weight: bold; margin-bottom: 15px;">{{ msg }}</p>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
 
         <form method="POST">
+            <label>Username</label>
+            <input type="text" name="username" required placeholder="Your username">
 
-            <label>Review Title</label>
-            <input type="text" name="review_title" required>
+            <label>Password</label>
+            <input type="password" name="password" required placeholder="Your password">
 
-
-            <label>Review Description</label>
-            <textarea name="review_text" rows="8" required></textarea>
-
-
-            <label>Rating</label>
-            <select name="review_rating">
-                <option>1</option>
-                <option>2</option>
-                <option>3</option>
-                <option>4</option>
-                <option selected>5</option>
-            </select>
-
-
-            <div class="prediction-box">
-                <h3>AI Recommendation Prediction</h3>
-
-                <div class="prediction-result">
-                    {{ prediction_label }}
-                </div>
-            </div>
-
-
-            <label>Override Recommendation</label>
-            <select name="is_a_buyer">
-                <option value="True">Buyer</option>
-                <option value="False">Not Buyer</option>
-            </select>
-
-
-            <button type="submit" class="submit-btn">
-                Submit Review
-            </button>
-
+            <button type="submit" class="submit-btn">Log In</button>
         </form>
-
+        <p style="margin-top: 20px;">Don't have an account? <a href="/signup" style="color: #000; font-weight: 600;">Sign up now</a></p>
     </section>
-
 </body>
 </html>
