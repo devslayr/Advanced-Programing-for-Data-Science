@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - GlowHaus</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
+
+    <div class="container my-5">
+        <header class="pb-3 mb-4 border-bottom d-flex justify-content-between align-items-center">
+            <span class="fs-4 fw-bold text-dark">✨ GlowHaus Control Panel</span>
+            <div>
+                <a href="/admin/logout" class="btn btn-danger btn-sm">Sign Out</a>
+            </div>
+        </header>
+
+        <div class="p-4 mb-4 bg-dark text-white rounded-3">
+            <div class="container-fluid py-2">
+                <h1 class="display-6 fw-bold">Live Model Performance Dashboard</h1>
+                <p class="fs-6 text-secondary mb-0">Real-time telemetry tracking AI prediction drift against human-validated override parameters.</p>
+            </div>
+        </div>
+
+        <div class="row g-4 text-center mb-5">
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Total Processed Logs</h6>
+                        <h2 class="display-6 fw-bold my-2">{{ stats['total'] if stats and 'total' in stats else '0' }}</h2>
+                        <span class="badge bg-secondary">System Active</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">True Buyer Ratio</h6>
+                        <h2 class="display-6 fw-bold my-2 text-primary">{{ stats['buyer_ratio'] if stats and 'buyer_ratio' in stats else '0.0' }}%</h2>
+                        <span class="small text-muted">Baseline Target: 78.7%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Human Override Rate</h6>
+                        <h2 class="display-6 fw-bold my-2 text-danger">{{ stats['override_rate'] if stats and 'override_rate' in stats else '0.0' }}%</h2>
+                        <span class="small text-muted">AI Mismatch Flags</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card h-100 border-0 shadow-sm">
+                    <div class="card-body">
+                        <h6 class="text-muted text-uppercase small">Production Accuracy</h6>
+                        <h2 class="display-6 fw-bold my-2 text-success">{{ stats['accuracy'] if stats and 'accuracy' in stats else '0.0' }}%</h2>
+                        <span class="badge bg-success-subtle text-success">Live Metric Evaluation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white py-3 fw-bold border-0">System Calibration Stream Logs</div>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th class="ps-4">Log ID</th>
+                            <th>Review Context</th>
+                            <th>Model Prediction</th>
+                            <th>Human Label</th>
+                            <th>Calibration Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if logs and logs|length > 0 %}
+                            {% for log in logs %}
+                            <tr>
+                                <td class="ps-4 text-muted">#{{ log['transaction_id'] if 'transaction_id' in log else '000000' }}</td>
+                                <td><strong>{{ log['title'] if 'title' in log else 'Untitled Context' }}</strong></td>
+                                <td>
+                                    {% set pred_class = 'bg-info text-dark' if log['predicted'] == 1 else 'bg-warning text-dark' %}
+                                    <span class="badge {{ pred_class }}">
+                                        {{ 'BUYER' if log['predicted'] == 1 else 'NON-BUYER' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% set actual_class = 'bg-info text-dark' if log['actual'] == 1 else 'bg-warning text-dark' %}
+                                    <span class="badge {{ actual_class }}">
+                                        {{ 'BUYER' if log['actual'] == 1 else 'NON-BUYER' }}
+                                    </span>
+                                </td>
+                                <td>
+                                    {% if log['overridden'] %}
+                                    <span class="text-danger fw-bold">⚠️ OVERRIDDEN (Human Calibration)</span>
+                                    {% else %}
+                                    <span class="text-success">✅ ALIGNED (Valid Prediction)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center py-4 text-muted small">No operational system streaming log telemetry found.</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if total_pages and total_pages > 1 %}
+            <div class="card-footer bg-white d-flex justify-content-between align-items-center py-3 border-top">
+                <span class="small text-muted">
+                    Page <strong>{{ current_page or 1 }}</strong> of <strong>{{ total_pages }}</strong>
+                </span>
+                <nav aria-label="Table navigation">
+                    <ul class="pagination pagination-sm mb-0">
+                        
+                        {% set prev_disabled = 'disabled' if current_page == 1 else '' %}
+                        <li class="page-item {{ prev_disabled }}">
+                            <a class="page-link text-dark" href="/admin/dashboard?page={{ (current_page or 1) - 1 }}" aria-label="Previous">
+                                <span aria-hidden="true">&laquo; Prev</span>
+                            </a>
+                        </li>
+
+                        {% for p in range(1, total_pages + 1) %}
+                            {% set is_active = 'active' if p == current_page else '' %}
+                            <li class="page-item {{ is_active }}">
+                                {% if p == current_page %}
+                                <span class="page-link bg-dark border-dark text-white">{{ p }}</span>
+                                {% else %}
+                                <a class="page-link text-dark" href="/admin/dashboard?page={{ p }}">{{ p }}</a>
+                                {% endif %}
+                            </li>
+                        {% endfor %}
+
+                        {% set next_disabled = 'disabled' if current_page == total_pages else '' %}
+                        <li class="page-item {{ next_disabled }}">
+                            <a class="page-link text-dark" href="/admin/dashboard?page={{ (current_page or 1) + 1 }}" aria-label="Next">
+                                <span aria-hidden="true">Next &raquo;</span>
+                            </a>
+                        </li>
+
+                    </ul>
+                </nav>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</body>
+</html>
