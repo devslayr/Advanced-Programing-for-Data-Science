@@ -9,74 +9,76 @@
 </head>
 <body>
 
-    <nav class="navbar">
-        <a href="/" class="logo">GlowHaus</a>
+    <nav class="navbar" style="display: flex; justify-content: space-between; align-items: center; padding: 22px 60px; border-bottom: 1px solid #eeeeee; background: white;">
+        <a href="/" class="logo" style="font-size: 28px; font-weight: 700; letter-spacing: 1px; color: #111111; text-decoration: none;">GlowHaus</a>
 
-        <form class="search-bar" method="GET" action="/search">
+        <form class="search-bar" method="GET" action="/search" style="display: flex; gap: 10px;">
             <input
                 type="text"
                 name="query"
                 placeholder="Search beauty products, brands..."
-                value="{{ query }}"
+                value="{{ query or '' }}"
+                style="width: 320px; padding: 12px 15px; border: 1px solid #dddddd; border-radius: 30px; font-size: 14px;"
             >
-            <button type="submit">Search</button>
+            <button type="submit" style="padding: 12px 20px; border: none; border-radius: 30px; background: black; color: white; cursor: pointer;">Search</button>
         </form>
 
-        <div class="nav-links">
-            <a href="#">New In</a>
-            <a href="#">Brands</a>
+        <div class="nav-links" style="display: flex; gap: 24px; align-items: center;">
+            <a href="#" style="text-decoration: none; color: #555555; font-size: 15px; font-weight: 500;">New In</a>
+            <a href="#" style="text-decoration: none; color: #555555; font-size: 15px; font-weight: 500;">Brands</a>
             
-            <!-- User session tracking block -->
-            {% if session.username %}
-                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px;">Hello, {{ session.username }}!</span>
-                <a href="/logout" style="color: #e74c3c;">Log Out</a>
+            {% if session and session.get('username') %}
+                <span class="user-greeting" style="font-weight: 600; color: #333; margin-right: 10px; font-size: 15px;">Hello, {{ session.get('username') }}!</span>
+                <a href="/logout" style="color: #e74c3c; text-decoration: none; font-size: 15px; font-weight: 500;">Log Out</a>
             {% else %}
-                <a href="/login">Log In</a>
-                <a href="/signup" style="font-weight: 600;">Sign Up</a>
+                <a href="/login" style="text-decoration: none; color: #555555; font-size: 15px; font-weight: 500;">Log In</a>
+                <a href="/signup" style="font-weight: 600; text-decoration: none; color: #555555; font-size: 15px;">Sign Up</a>
             {% endif %}
+            <a href="/admin/login" style="padding: 6px 14px; background-color: #000; color: #fff; border-radius: 4px; text-decoration: none; font-weight: 500; font-size: 0.85rem;">Admin Portal</a>
         </div>
     </nav>
 
-
     <section class="review-form-container">
 
-        <h1>Create Review</h1>
+        <h2>Create Review</h2>
 
         <form method="POST">
 
-            <label>Review Title</label>
-            <input type="text" name="review_title" required>
+            <div class="form-group">
+                <label for="review_title">Review Title</label>
+                <input type="text" id="review_title" name="review_title" placeholder="Summarize your experience..." required>
+            </div>
 
+            <div class="form-group">
+                <label for="review_text">Review Description</label>
+                <textarea id="review_text" name="review_text" placeholder="Share details of your beauty experience... How does it feel? Long-lasting?" required></textarea>
+            </div>
 
-            <label>Review Description</label>
-            <textarea name="review_text" rows="8" required></textarea>
+            <div class="form-group">
+                <label for="review_rating">Rating</label>
+                <select id="review_rating" name="review_rating">
+                    <option value="1">1 ⭐</option>
+                    <option value="2">2 ⭐</option>
+                    <option value="3">3 ⭐</option>
+                    <option value="4">4 ⭐</option>
+                    <option value="5" selected>5 ⭐</option>
+                </select>
+            </div>
 
-
-            <label>Rating</label>
-            <select name="review_rating">
-                <option>1</option>
-                <option>2</option>
-                <option>3</option>
-                <option>4</option>
-                <option selected>5</option>
-            </select>
-
-
-            <div class="prediction-box">
-                <h3>AI Recommendation Prediction</h3>
-
-                <div class="prediction-result">
-                    {{ prediction_label }}
+            <div class="prediction-box" style="background-color: #f9f9f9; padding: 20px; border-radius: 6px; border: 1px solid #eeeeee; margin-bottom: 24px;">
+                <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; color: #333;">AI Recommendation Prediction</h3>
+                <div class="prediction-result" style="font-size: 16px; font-weight: 700; color: #111111;">
+                    {{ prediction_label or 'Awaiting dynamic calculation tokens...' }}
                 </div>
             </div>
 
-
-            <label>Override Recommendation</label>
-            <select name="is_a_buyer">
-                <option value="True">Buyer</option>
-                <option value="False">Not Buyer</option>
-            </select>
-
+            <div class="form-group">
+                <label for="is_a_buyer">Buyer Verification Status</label>
+                <select id="is_a_buyer" name="is_a_buyer">
+                    <option value="Verified Buyer">Verified Buyer</option>
+                    <option value="Guest User">Guest User</option>
+                </select>
+            </div>
 
             <button type="submit" class="submit-btn">
                 Submit Review
@@ -85,6 +87,11 @@
         </form>
 
     </section>
+
+    <footer style="text-align: center; padding: 30px 0; margin-top: 80px; border-top: 1px solid #eeeeee;">
+        <p style="color: #111111; font-size: 0.95rem; margin-bottom: 0;">GlowHaus Beauty &copy; 2026</p>
+        <p><a href="/admin/login" style="color: #666; text-decoration: none; font-size: 0.85rem; display: block; margin-top: 5px;">System Management Portal</a></p>
+    </footer>
 
 </body>
 </html>
