@@ -25,7 +25,7 @@
             <button type="submit">Search</button>
         </form>
 
-        <div class="nav-links" style="display: flex; align-items: center;">
+        <div class="nav-links">
             <a href="#">New In</a>
             <a href="#">Brands</a>
             
@@ -65,11 +65,7 @@
                 <select name="brand" id="brand" onchange="document.getElementById('filter-sort-form').submit();">
                     <option value="">All Brands</option>
                     {% for brand in brands %}
-                        {% set is_brand_selected = '' %}
-                        {% if selected_brand == brand %}
-                            {% set is_brand_selected = 'selected' %}
-                        {% endif %}
-                        <option value="{{ brand }}" {{ is_brand_selected }}>{{ brand }}</option>
+                        <option value="{{ brand }}" {{ 'selected' if selected_brand == brand else '' }}>{{ brand }}</option>
                     {% endfor %}
                 </select>
             </div>
@@ -90,20 +86,17 @@
 
         {% if products and products|length > 0 %}
             {% for product in products %}
-            {% set product_title = product['product_name'] if 'product_name' in product else 'Untitled Product' %}
-            {% set title_length = product_title|length %}
-            {% set size_class = 'product-card-link--span-3' if title_length >= 75 else 'product-card-link--span-2' if title_length >= 42 else '' %}
-            <a href="/product/{{ product['id'] if 'id' in product else 0 }}" class="product-card-link {{ size_class }}">
+            <a href="/product/{{ product['id'] if 'id' in product else 0 }}" class="product-card-link">
                 <div class="product-card">
 
-                    <div class="image-container">
+                    <div class="product-image-wrapper">
                         <img src="{{ product['image'] if 'image' in product else '' }}" alt="{{ product['product_name'] if 'product_name' in product else 'Cosmetic' }}">
                     </div>
 
                     <div class="product-info">
                         <p class="brand-name">{{ product['brand_name'] if 'brand_name' in product else 'Generic Brand' }}</p>
 
-                        <h3>{{ product_title }}</h3>
+                        <h3>{{ product['product_name'] if 'product_name' in product else 'Untitled Product' }}</h3>
 
                         <p class="price">Rs. {{ product['price'] if 'price' in product else '0.00' }}</p>
 
