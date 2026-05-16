@@ -558,15 +558,53 @@ def product_detail(id):
         recommendations=recommendations
     )
 
-
 @app.route("/review/<int:id>", methods=["GET", "POST"])
 def create_review(id):
-    prediction_label = "Buyer"
+    prediction_label = "Verified Buyer"
 
-    return render_template(
-        "review.html",
-        prediction_label=prediction_label
-    )
+    if request.method == "POST":
+        title = request.form.get("review_title", "").strip()
+        text = request.form.get("review_text", "").strip()
+        rating = request.form.get("review_rating", "5")
+        
+        is_buyer_override = request.form.get("is_a_buyer", "True")
+        buyer_status = "Verified Buyer" if is_buyer_override == "True" else "Guest User"
+
+        existing_reviews = load_all_reviews()
+        next_review_id = len(existing_reviews) + 1
+
+        # Check if the file exists and if its last character is a newline
+        needs_newline = False
+        if os.path.exists(REVIEWS_CSV) and os.stat(REVIEWS_CSV).st_size > 0:
+            with open(REVIEWS_CSV, "rb") as f:
+                f.seek(-1, os.SEEK_END)
+                if f.read(1) != b"\n":
+                    needs_newline = True
+
+        # Open in append mode
+        with open(REVIEWS_CSV, mode="a", encoding="utf-8-sig", newline="") as file:
+            # If the file didn't end cleanly, inject a quick newline first
+            if needs_newline:
+                file.write("\n")
+
+            fieldnames = ["review_id", "product_id", "review_title", "review_rating", "review_text", "is_a_buyer"]
+            writer = csv.DictWriter(file, fieldnames=fieldnames)
+            
+            if os.stat(REVIEWS_CSV).st_size == 0:
+                writer.writeheader()
+
+            writer.writerow({
+                "review_id": next_review_id,
+                "product_id": id,
+                "review_title": title,
+                "review_rating": float(rating),
+                "review_text": text,
+                "is_a_buyer": buyer_status
+            })
+
+        return redirect(url_for("product_detail", id=id))
+
+    return render_template("review.html", prediction_label=prediction_label)
 
 
 if __name__ == "__main__":
