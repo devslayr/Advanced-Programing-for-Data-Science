@@ -131,7 +131,6 @@ body {
 .product-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    grid-auto-flow: dense;
     gap: 35px;
     padding: 30px 60px 80px;
 }
@@ -139,31 +138,6 @@ body {
 .product-card-link {
     text-decoration: none;
     color: inherit;
-}
-
-.wide-product {
-    grid-column: span 2;
-}
-
-.featured-product {
-    grid-column: span 3;
-}
-
-.wide-product .product-info,
-.featured-product .product-info {
-    padding-top: 18px;
-}
-
-.wide-product .product-card img,
-.featured-product .product-card img {
-    height: 380px;
-}
-
-.wide-product .product-info h3,
-.featured-product .product-info h3 {
-    max-width: 760px;
-    font-size: 22px;
-    line-height: 1.3;
 }
 
 .product-card {
@@ -205,6 +179,15 @@ body {
     font-size: 18px;
     font-weight: 500;
     margin-bottom: 10px;
+}
+
+/* Line 214 Fix: Standard property compatibility rule applied */
+.product-info h3 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2; 
+    -webkit-box-orient: vertical;  
+    overflow: hidden;
 }
 
 .price {
@@ -384,26 +367,6 @@ footer {
         grid-template-columns: 1fr;
     }
 
-    .wide-product,
-    .featured-product {
-        grid-column: span 1;
-    }
-
-    .wide-product .product-info,
-    .featured-product .product-info {
-        padding: 18px 0 0;
-    }
-
-    .wide-product .product-card img,
-    .featured-product .product-card img {
-        height: 340px;
-    }
-
-    .wide-product .product-info h3,
-    .featured-product .product-info h3 {
-        font-size: 18px;
-    }
-
     .hero {
         padding: 20px;
     }
@@ -420,8 +383,6 @@ footer {
         width: 90%;
     }
 }
-<<<<<<< HEAD
-=======
 
 .controls-section {
     max-width: 1200px;
@@ -479,6 +440,15 @@ footer {
     color: #111;
 }
 
+/* Line 476 Fix: Standard property compatibility rule applied */
+.review-card p {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
 .review-rating {
     color: #e67e22;
     font-weight: 600;
@@ -497,7 +467,3 @@ footer {
     padding: 4px 8px;
     border-radius: 4px;
 }
-
-
-
->>>>>>> origin/feat/add-filter
