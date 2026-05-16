@@ -1,8 +1,6 @@
 import csv
 import re
-from collections import Counter
 from difflib import SequenceMatcher
-from math import sqrt
 from pathlib import Path
 
 from flask import Flask, render_template, request, abort
@@ -305,79 +303,6 @@ def search_products(products, query):
     return [product for score, rating, product in scored_products]
 
 
-def get_similarity_tokens(product):
-    """
-    Build tokens used for product recommendations.
-    Recommendations compare product title, brand and tags with cosine similarity.
-    """
-    tags = product["product_tags"]
-
-    if tags.lower() == "nan":
-        tags = ""
-
-    text = f"{product['brand_name']} {product['product_name']} {tags}"
-
-    return [
-        word for word in normalize_text(text).split()
-        if len(word) >= 3
-    ]
-
-
-def get_product_vector(product):
-    """
-    Convert a product into a simple token-count vector for cosine similarity.
-    """
-    return Counter(get_similarity_tokens(product))
-
-
-def cosine_similarity(first_vector, second_vector):
-    """
-    Calculate cosine similarity between two token-count vectors.
-    A score closer to 1.0 means the products share more similar words/tags.
-    """
-    if not first_vector or not second_vector:
-        return 0.0
-
-    shared_tokens = set(first_vector) & set(second_vector)
-    dot_product = sum(first_vector[token] * second_vector[token] for token in shared_tokens)
-
-    first_length = sqrt(sum(value * value for value in first_vector.values()))
-    second_length = sqrt(sum(value * value for value in second_vector.values()))
-
-    if first_length == 0 or second_length == 0:
-        return 0.0
-
-    return dot_product / (first_length * second_length)
-
-
-def get_similar_products(products, selected_product, limit=5):
-    """
-    Return the most similar products using cosine similarity.
-    If similarity is tied, higher-rated products are shown first.
-    """
-    selected_vector = get_product_vector(selected_product)
-    scored_products = []
-
-    for product in products:
-        if product["id"] == selected_product["id"]:
-            continue
-
-        product_vector = get_product_vector(product)
-        similarity_score = cosine_similarity(selected_vector, product_vector)
-
-        scored_products.append(
-            (
-                similarity_score,
-                product["avg_product_rating"],
-                product,
-            )
-        )
-
-    scored_products.sort(key=lambda item: (item[0], item[1]), reverse=True)
-
-    return [product for score, rating, product in scored_products[:limit]]
-
-
 def create_description(product):
     """
     Create a product detail description from the CSV information.
@@ -478,7 +403,12 @@ def product_detail(id):
 
     reviews = []
 
-    recommendations = get_similar_products(products, product)
+    # Simple temporary recommendation:
+    # show products from the same brand.
+    recommendations = [
+        item for item in products
+        if item["brand_name"] == product["brand_name"] and item["id"] != product["id"]
+    ][:4]
 
     return render_template(
         "product.html",
