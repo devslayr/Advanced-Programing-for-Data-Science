@@ -49,6 +49,34 @@
         <p class="result-message">{{ result_message }}</p>
     </section>
 
+    <section class="controls-section">
+        <form method="GET" action="/" id="filter-sort-form">
+            <!-- Preserve search query if there is one -->
+            {% if query %}
+            <input type="hidden" name="query" value="{{ query }}">
+            {% endif %}
+
+            <div class="control-group">
+                <label for="brand">Brand:</label>
+                <select name="brand" id="brand" onchange="document.getElementById('filter-sort-form').submit();">
+                    <option value="">All Brands</option>
+                    {% for brand in brands %}
+                    <option value="{{ brand }}" {% if selected_brand == brand %}selected{% endif %}>{{ brand }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="sort">Sort By:</label>
+                <select name="sort" id="sort" onchange="document.getElementById('filter-sort-form').submit();">
+                    <option value="" {% if not selected_sort %}selected{% endif %}>Default</option>
+                    <option value="price_low" {% if selected_sort == 'price_low' %}selected{% endif %}>Price: Low to High</option>
+                    <option value="price_high" {% if selected_sort == 'price_high' %}selected{% endif %}>Price: High to Low</option>
+                    <option value="rating_high" {% if selected_sort == 'rating_high' %}selected{% endif %}>Highest Rated</option>
+                </select>
+            </div>
+        </form>
+    </section>
 
     <section class="product-grid">
 

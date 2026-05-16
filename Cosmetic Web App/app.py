@@ -425,14 +425,46 @@ def load_products():
 
 @app.route("/")
 def home():
-    products = load_products()
+    # 1. Load all products
+    all_products = load_products()
+    
+    # 2. Extract unique brands dynamically for the dropdown filter
+    # Using sorted set to avoid duplicates and show them alphabetically
+    brands = sorted(list(set(p["brand_name"] for p in all_products if p["brand_name"])))
+
+    # 3. Get filter and sort parameters from the URL
+    selected_brand = request.args.get("brand", "").strip()
+    selected_sort = request.args.get("sort", "").strip()
+    query = request.args.get("query", "").strip() # In case you want to integrate search later
+
+    filtered_products = all_products
+
+    # 4. Apply Brand Filter
+    if selected_brand:
+        filtered_products = [p for p in filtered_products if p["brand_name"].lower() == selected_brand.lower()]
+
+    # 5. Apply Sorting
+    if selected_sort == "price_low":
+        filtered_products.sort(key=lambda x: x["price"] if x["price"] is not None else float('inf'))
+    elif selected_sort == "price_high":
+        filtered_products.sort(key=lambda x: x["price"] if x["price"] is not None else float('-inf'), reverse=True)
+    elif selected_sort == "rating_high":
+        filtered_products.sort(key=lambda x: x["avg_product_rating"] if x["avg_product_rating"] is not None else 0, reverse=True)
+
+    # 6. Build contextual result message
+    result_message = f"Showing {len(filtered_products)} cosmetics and beauty products."
+    if selected_brand:
+        result_message += f" Filtered by Brand: {selected_brand}."
 
     return render_template(
         "index.html",
-        products=products,
+        products=filtered_products,
+        brands=brands,
+        selected_brand=selected_brand,
+        selected_sort=selected_sort,
         page_title="Trending Beauty Products",
-        query="",
-        result_message=f"Showing {len(products)} cosmetics and beauty products."
+        query=query,
+        result_message=result_message
     )
 
 
